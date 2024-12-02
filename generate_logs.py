@@ -210,14 +210,14 @@ def generate_logs():
             message = "Incomplete log message due to missing data."
 
         entries.append({
-            'Timestamp': timestamp.isoformat() + 'Z',
-            'Level': level,
-            'Source': source,
-            'Message': message
+            '@timestamp': timestamp.isoformat() + 'Z',
+            'log.level': level,
+            'source': source,
+            'message': message
         })
 
     # Sort entries by timestamp
-    entries.sort(key=lambda x: x['Timestamp'])
+    entries.sort(key=lambda x: x['@timestamp'])
 
     # Create output directory if it doesn't exist
     output_dir = 'output_csv'
@@ -229,8 +229,8 @@ def generate_logs():
     filepath = os.path.join(output_dir, filename)
 
     # Write to CSV file
-    with open(filepath, 'w', newline='') as csvfile:
-        fieldnames = ['Timestamp', 'Level', 'Source', 'Message']
+    with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
+        fieldnames = ['@timestamp', 'log.level', 'source', 'message']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         writer.writeheader()

@@ -83,10 +83,10 @@ python3 generate_logs.py
 The script will create a file named logs_dataset.csv in the current directory.
 
 - The dataset will contain log entries with the following fields:
-  - Timestamp
-  -	Level
-  -	Source
-  -	Message 
+  - @timestamp
+  -	log.level
+  -	source
+  -	message 
 
 ### **5. Customization**
 

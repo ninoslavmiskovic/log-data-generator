@@ -1,0 +1,15 @@
+# Ignore virtual environment directories
+venv/
+env/
+.env/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore output files
+output_csv/
+
+# Ignore IDE/project files
+.vscode/
+.idea/

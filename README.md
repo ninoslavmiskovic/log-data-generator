@@ -2,6 +2,18 @@
 
 This Python script generates a synthetic dataset of unstructured logs in CSV format, simulating logs from various services over a one-year period. The logs include different severity levels, sources, and detailed messages with dynamic content, suitable for testing, analysis, or demonstration purposes.
 
+## Ensuring Unique Datasets on Each Execution
+
+Because the script relies on randomization without a fixed seed, every time you execute it:
+- New Log Entries: You’ll get a fresh set of log entries, with different timestamps, sources, levels, and messages.
+- Varied Data: Usernames, IP addresses, transaction details, and other data points will be unique.
+- Different Patterns: While the overall structure and patterns (like error spikes) remain consistent, the specific details and timing will change.
+
+This behavior is beneficial for:
+- Testing: Allows you to test your log analysis tools or applications with varied data.
+- Simulation: Helps simulate real-world scenarios where log data is never the same.
+- Learning: Provides diverse datasets for practice in data analysis, machine learning, or cybersecurity.
+
 ## Features
 
 - **Simulates realistic log data** from multiple services:
@@ -130,11 +142,18 @@ Timestamp,Level,Source,Message
 ...
 ```
 
----
+### **7. Generating Multiple Datasets**
 
-### **7. Troubleshooting**
+Each time you run the script, it will generate a new CSV file with an incremented sequence number and place it in the `output_csv` directory.
 
-#### **7.1. ModuleNotFoundError: No module named 'faker'**
+- **Output Files:**
+
+  - Files are named in the format `logs_dataset_0001.csv`, `logs_dataset_0002.csv`, etc.
+  - Located in the `output_csv` directory.
+
+### **8. Troubleshooting**
+
+#### **8.1. ModuleNotFoundError: No module named 'faker'**
 
 - Ensure that you have activated your virtual environment (if using one).
 - Install the Faker library:
@@ -146,11 +165,11 @@ pip install Faker
 
 ---
 
-### **8. Contributing**
+### **9. Contributing**
 
 Contributions are welcome! Please feel free to submit a pull request or open an issue if you have suggestions or find any bugs.
 
-### **9.License
+### **10.License**
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 

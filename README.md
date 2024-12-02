@@ -142,6 +142,8 @@ Timestamp,Level,Source,Message
 ...
 ```
 
+There is a file in the repo: ***"example_output_logs_dataset.csv"*** you can download and see an example of the output csv.
+
 ### **7. Generating Multiple Datasets**
 
 Each time you run the script, it will generate a new CSV file with an incremented sequence number and place it in the `output_csv` directory.

@@ -1,4 +1,4 @@
-# Log Data Generator
+# Unstructured Log Data Generator
 
 This Python script generates a synthetic dataset of unstructured logs in CSV format, simulating logs from various services over a one-year period. The logs include different severity levels, sources, and detailed messages with dynamic content, suitable for testing, analysis, or demonstration purposes.
 

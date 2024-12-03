@@ -119,11 +119,11 @@ def random_timestamp(start, end):
 
 # Function to get the next sequence number for the output file
 def get_next_sequence_number(output_dir):
-    existing_files = [f for f in os.listdir(output_dir) if f.startswith('logs_dataset_') and f.endswith('.csv')]
+    existing_files = [f for f in os.listdir(output_dir) if f.startswith('unstructured-logs-') and f.endswith('.csv')]
     sequence_numbers = []
     for filename in existing_files:
         try:
-            seq_num = int(filename.split('_')[-1].split('.csv')[0])
+            seq_num = int(filename.replace('unstructured-logs-', '').replace('.csv', ''))
             sequence_numbers.append(seq_num)
         except ValueError:
             continue
@@ -225,7 +225,7 @@ def generate_logs():
 
     # Determine the next sequence number for the output file
     next_seq_num = get_next_sequence_number(output_dir)
-    filename = f"logs_dataset_{next_seq_num:04d}.csv"
+    filename = f"unstructured-logs-{next_seq_num:03d}.csv"
     filepath = os.path.join(output_dir, filename)
 
     # Write to CSV file

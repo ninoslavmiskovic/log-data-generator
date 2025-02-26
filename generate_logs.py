@@ -3,13 +3,18 @@ import random
 import datetime
 import os
 import json
+import uuid
 from faker import Faker
 
 fake = Faker()
 
+# ------------------------------
+# Part 1: Generate CSV Logs
+# ------------------------------
+
 # Define log.level values and sources
-log_levels_list = ['INFO', 'WARN', 'ERROR', 'DEBUG']
-sources = ['AuthService', 'PaymentService', 'DatabaseService', 'NotificationService', 'CacheService']
+log_levels_list = ["INFO", "WARN", "ERROR", "DEBUG"]
+sources = ["AuthService", "PaymentService", "DatabaseService", "NotificationService", "CacheService"]
 
 # Log messages dictionary
 messages = {
@@ -114,11 +119,9 @@ messages = {
     },
 }
 
-# Generate a random timestamp within the last year
 def random_timestamp(start, end):
     return start + datetime.timedelta(seconds=random.randint(0, int((end - start).total_seconds())))
 
-# Get next sequence number for log CSV filename
 def get_next_sequence_number(output_dir):
     existing_files = [f for f in os.listdir(output_dir) if f.startswith("unstructured-logs-") and f.endswith(".csv")]
     sequence_numbers = []
@@ -130,7 +133,6 @@ def get_next_sequence_number(output_dir):
             continue
     return max(sequence_numbers) + 1 if sequence_numbers else 1
 
-# Generate log entries and save as CSV using "log.level" as the field name.
 def generate_logs():
     num_entries = 10000  # Adjust as needed
     entries = []
@@ -192,7 +194,7 @@ def generate_logs():
             print(f"KeyError: Missing key {e} for source '{source}', level '{level}'")
             message = "Incomplete log message due to missing data."
         
-        # Use "log.level" as the key (with a dot) for ES|QL compatibility
+        # Use "log.level" as the key (with a dot) for ES|QL compatibility.
         entries.append({
             "@timestamp": timestamp.isoformat() + "Z",
             "log.level": level,
@@ -207,7 +209,6 @@ def generate_logs():
     filename = f"unstructured-logs-{next_seq_num:03d}.csv"
     filepath = os.path.join(output_dir, filename)
     with open(filepath, "w", newline="", encoding="utf-8") as csvfile:
-        # Fieldnames include "log.level" (with a dot)
         fieldnames = ["@timestamp", "log.level", "source", "message"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -215,16 +216,17 @@ def generate_logs():
             writer.writerow(entry)
     print(f"Dataset generated successfully! File saved as '{filepath}'")
 
-# Generate Kibana Discover Saved Search objects as NDJSON.
-def generate_kibana_saved_objects():
-    # Saved search definitions with explanatory titles and ES|QL queries.
-    saved_search_definitions = [
+# ------------------------------
+# Part 2: Generate Saved Objects (Discover sessions, Lens, Dashboard)
+# ------------------------------
+
+def generate_saved_searches():
+    definitions = [
         {
             "title": "Retrieve All Logs",
             "description": "Displays all logs sorted by timestamp in ascending order.",
             "query": (
                 "FROM unstructured-logs\n"
-                "| where @timestamp >= now() - 1y // filter for logs from the last 1 year\n"
                 "| sort @timestamp asc // sort logs by timestamp in ascending order"
             ),
             "columns": [],
@@ -235,7 +237,6 @@ def generate_kibana_saved_objects():
             "description": "Counts the number of logs for each log level.",
             "query": (
                 "FROM unstructured-logs\n"
-                "| where @timestamp >= now() - 1y // filter for logs from the last 1 year\n"
                 "| stats count_all = count() by log.level // count logs grouped by log.level\n"
                 "| sort count_all desc // sort counts in descending order"
             ),
@@ -247,7 +248,6 @@ def generate_kibana_saved_objects():
             "description": "Counts the number of logs for each source.",
             "query": (
                 "FROM unstructured-logs\n"
-                "| where @timestamp >= now() - 1y // filter for logs from the last 1 year\n"
                 "| stats count_all = count() by source // count logs grouped by source\n"
                 "| sort count_all desc // sort counts in descending order"
             ),
@@ -259,7 +259,6 @@ def generate_kibana_saved_objects():
             "description": "Shows error logs with timestamp, source, and message.",
             "query": (
                 "FROM unstructured-logs\n"
-                "| where @timestamp >= now() - 1y // filter for logs from the last 1 year\n"
                 "| where log.level == \"ERROR\" // filter for error logs\n"
                 "| sort @timestamp desc // sort logs by timestamp in descending order\n"
                 "| keep @timestamp, source, message // keep only timestamp, source, and message fields"
@@ -272,8 +271,7 @@ def generate_kibana_saved_objects():
             "description": "Parses AuthService info logs using dissect to extract user and IP address.",
             "query": (
                 "FROM unstructured-logs\n"
-                "| where @timestamp >= now() - 1y // filter for logs from the last 1 year\n"
-                "| dissect message \"User '%{user}' logged in successfully from IP address %{ip_address}\" // extract user and ip_address from message using dissect\n"
+                "| dissect message \"User '%{user}' logged in successfully from IP address %{ip_address}\" // extract user and ip_address using dissect\n"
                 "| where source == \"AuthService\" and log.level == \"INFO\" // filter for AuthService info logs\n"
                 "| sort @timestamp desc // sort logs by timestamp in descending order\n"
                 "| keep @timestamp, user, ip_address // keep only timestamp, user, and ip_address fields"
@@ -286,7 +284,6 @@ def generate_kibana_saved_objects():
             "description": "Parses AuthService info logs using grok to extract user and IP address.",
             "query": (
                 "FROM unstructured-logs\n"
-                "| where @timestamp >= now() - 1y // filter for logs from the last 1 year\n"
                 "| grok message \"User '%{USERNAME:user}' logged in successfully from IP address %{IP:ip_address}\" // extract user and ip_address using grok\n"
                 "| where source == \"AuthService\" and log.level == \"INFO\" // filter for AuthService info logs\n"
                 "| sort @timestamp desc // sort logs by timestamp in descending order\n"
@@ -297,40 +294,37 @@ def generate_kibana_saved_objects():
         }
     ]
     
-    # Use a fixed index object (as in your modified example)
-    index_obj = {
-        "id": "dbe3d33b8a15e80b61e4f52b8275675f49f957abaf82d186f114f1518eea4733",
-        "title": "unstructured-logs",
-        "timeFieldName": "@timestamp",
-        "sourceFilters": [],
-        "type": "esql",
-        "fieldFormats": {},
-        "runtimeFieldMap": {},
-        "allowNoIndex": False,
-        "name": "unstructured-logs",
-        "allowHidden": False
-    }
-    
-    # Compute time range: last 12 months from now
     now_dt = datetime.datetime.utcnow()
     one_year_ago_dt = now_dt - datetime.timedelta(days=365)
     now_iso = now_dt.isoformat() + "Z"
     one_year_ago_iso = one_year_ago_dt.isoformat() + "Z"
     
-    now_str = now_iso
     created_by = "u_mGBROF_q5bmFCATbLXAcCwKa0k8JvONAwSruelyKA5E_0"
-    version = "WzExLDFd"
-    
-    ndjson_lines = []
-    # Create each saved search object with ID as Discover_session_X and the descriptive title.
-    for i, ss in enumerate(saved_search_definitions, start=1):
+    version = "8.9.0"
+    now_str = now_iso
+
+    saved_searches = []
+    for d in definitions:
+        panel_uuid = str(uuid.uuid4())
+        panel_ref = f"{panel_uuid}:panel_{panel_uuid}"
         search_source = {
-            "query": {"esql": ss["query"]},
-            "index": index_obj,
+            "query": {"esql": d["query"]},
+            "index": {
+                "id": "dbe3d33b8a15e80b61e4f52b8275675f49f957abaf82d186f114f1518eea4733",
+                "title": "unstructured-logs",
+                "timeFieldName": "@timestamp",
+                "sourceFilters": [],
+                "type": "esql",
+                "fieldFormats": {},
+                "runtimeFieldMap": {},
+                "allowNoIndex": False,
+                "name": "unstructured-logs",
+                "allowHidden": False
+            },
             "filter": []
         }
-        saved_object = {
-            "id": f"Discover_session_{i}",
+        obj = {
+            "id": f"Discover_session_{len(saved_searches)+1}",
             "type": "search",
             "namespaces": ["default"],
             "updated_at": now_str,
@@ -339,38 +333,191 @@ def generate_kibana_saved_objects():
             "updated_by": created_by,
             "version": version,
             "attributes": {
-                "title": ss["title"],
-                "description": ss["description"],
+                "title": d["title"],
+                "description": d["description"],
                 "hits": 0,
-                "columns": ss["columns"],
-                "sort": ss["sort"],
+                "columns": d["columns"],
+                "sort": d["sort"],
                 "kibanaSavedObjectMeta": {
                     "searchSourceJSON": json.dumps(search_source)
                 },
                 "grid": {},
                 "hideChart": False,
                 "isTextBasedQuery": True,
-                "timeRestore": False,
+                "timeRestore": True,
                 "timeRange": {
                     "from": one_year_ago_iso,
                     "to": now_iso
                 }
             },
-            "references": [],
+            "references": [
+                {
+                    "name": panel_ref,
+                    "type": "search",
+                    "id": f"Discover_session_{len(saved_searches)+1}"
+                }
+            ],
             "managed": False,
-            "coreMigrationVersion": "8.8.0",
-            "typeMigrationVersion": "10.5.0"
+            "coreMigrationVersion": "8.9.0",
+            "typeMigrationVersion": "8.9.0"
         }
-        ndjson_lines.append(json.dumps(saved_object))
+        obj["panelRefName"] = panel_ref
+        saved_searches.append(obj)
+    return saved_searches
+
+def generate_lens_saved_object():
+    now_dt = datetime.datetime.utcnow()
+    now_iso = now_dt.isoformat() + "Z"
+    created_by = "u_mGBROF_q5bmFCATbLXAcCwKa0k8JvONAwSruelyKA5E_0"
+    version = "8.9.0"
+    # Use "state" instead of "lensState" to avoid strict dynamic mapping errors.
+    lens_obj = {
+        "id": "Sample_Lens_1",
+        "type": "lens",
+        "namespaces": ["default"],
+        "updated_at": now_iso,
+        "created_at": now_iso,
+        "created_by": created_by,
+        "updated_by": created_by,
+        "version": version,
+        "attributes": {
+            "title": "Sample Lens Visualization",
+            "visualizationType": "lnsXY",
+            "state": {
+                "datasourceStates": {
+                    "textBased": {
+                        "layers": {}
+                    }
+                },
+                "visualization": {},
+                "query": {"query": "", "language": "kuery"},
+                "filters": []
+            }
+        },
+        "references": [],
+        "managed": False,
+        "coreMigrationVersion": "8.9.0",
+        "typeMigrationVersion": "8.9.0"
+    }
+    return lens_obj
+
+def generate_dashboard(saved_searches, lens_obj):
+    now_dt = datetime.datetime.utcnow()
+    now_iso = now_dt.isoformat() + "Z"
+    created_by = "u_mGBROF_q5bmFCATbLXAcCwKa0k8JvONAwSruelyKA5E_0"
+    version = "8.9.0"
+    dashboard_id = str(uuid.uuid4())
+
+    panels = []
+    references = []
+    # Arrange each Discover session in a 2-column grid.
+    for ss in saved_searches:
+        panels.append({
+            "type": "search",
+            "title": ss["attributes"]["title"],
+            "panelRefName": ss["panelRefName"],
+            "embeddableConfig": {
+                "description": ss["attributes"]["description"]
+            },
+            "panelIndex": ss["panelRefName"],
+            "gridData": {
+                "x": 0 if len(panels) % 2 == 0 else 24,
+                "y": (len(panels) // 2) * 15,
+                "w": 24,
+                "h": 15,
+                "i": ss["panelRefName"]
+            }
+        })
+        references.append({
+            "name": ss["panelRefName"],
+            "type": "search",
+            "id": ss["id"]
+        })
+    # Create a unique panel for the Lens visualization by reference.
+    lens_uuid = str(uuid.uuid4())
+    lens_ref = f"{lens_uuid}:panel_{lens_uuid}"
+    panels.append({
+        "type": "lens",
+        "title": lens_obj["attributes"]["title"],
+        "panelRefName": lens_ref,
+        "embeddableConfig": {
+            "description": lens_obj["attributes"]["title"],
+            "query": {"esql": "FROM unstructured-logs\n| sort @timestamp asc\n| eval week = DATE_TRUNC(1w, @timestamp) | stats count(*) by week"}
+        },
+        "panelIndex": lens_ref,
+        "gridData": {
+            "x": 0,
+            "y": (len(saved_searches) // 2) * 15,
+            "w": 48,
+            "h": 15,
+            "i": lens_ref
+        }
+    })
+    references.append({
+        "name": lens_ref,
+        "type": "lens",
+        "id": lens_obj["id"]
+    })
+    
+    dashboard_obj = {
+        "id": dashboard_id,
+        "type": "dashboard",
+        "namespaces": ["default"],
+        "updated_at": now_iso,
+        "created_at": now_iso,
+        "created_by": created_by,
+        "updated_by": created_by,
+        "version": version,
+        "attributes": {
+            "version": 3,
+            "description": "",
+            "refreshInterval": {"pause": True, "value": 60000},
+            "timeRestore": True,
+            "timeFrom": "now-1y",
+            "timeTo": "now",
+            "title": "Dashboard_example_with_all_ES|QL_panels",
+            "controlGroupInput": {},
+            "optionsJSON": json.dumps({
+                "useMargins": True,
+                "syncColors": False,
+                "syncCursor": True,
+                "syncTooltips": False,
+                "hidePanelTitles": False
+            }),
+            "panelsJSON": json.dumps(panels),
+            "kibanaSavedObjectMeta": {
+                "searchSourceJSON": json.dumps({"filter": [], "query": {"query": "", "language": "kuery"}})
+            }
+        },
+        "references": references,
+        "managed": False,
+        "coreMigrationVersion": "8.9.0",
+        "typeMigrationVersion": "8.9.0"
+    }
+    return dashboard_obj
+
+def write_saved_objects():
+    saved_searches = generate_saved_searches()
+    lens_obj = generate_lens_saved_object()
+    dashboard_obj = generate_dashboard(saved_searches, lens_obj)
+    
+    all_objects = []
+    all_objects.extend(saved_searches)
+    all_objects.append(lens_obj)
+    all_objects.append(dashboard_obj)
     
     output_dir = "output_saved_objects"
     os.makedirs(output_dir, exist_ok=True)
-    filepath = os.path.join(output_dir, "kibana_saved_searches.ndjson")
+    filepath = os.path.join(output_dir, "kibana_saved_objects.ndjson")
     with open(filepath, "w", encoding="utf-8") as f:
-        for line in ndjson_lines:
-            f.write(line + "\n")
-    print(f"Kibana Saved Search objects generated successfully! File saved as '{filepath}'")
+        for obj in all_objects:
+            f.write(json.dumps(obj) + "\n")
+    print(f"Kibana Saved Objects generated successfully! File saved as '{filepath}'")
+
+# ------------------------------
+# Main
+# ------------------------------
 
 if __name__ == "__main__":
     generate_logs()
-    generate_kibana_saved_objects()
+    write_saved_objects()

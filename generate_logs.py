@@ -138,11 +138,10 @@ def generate_logs():
     entries = []
     start_date = datetime.datetime.now() - datetime.timedelta(days=365)
     end_date = datetime.datetime.now()
-    # Create error spikes roughly every 30 days
     error_spike_dates = [start_date + datetime.timedelta(days=30 * i) for i in range(1, 13)]
     
     for i in range(num_entries):
-        if random.random() < 0.05:  # 5% chance for an error spike
+        if random.random() < 0.05:
             timestamp = random.choice(error_spike_dates) + datetime.timedelta(seconds=random.randint(0, 3600))
             level = "ERROR"
         else:
@@ -194,7 +193,6 @@ def generate_logs():
             print(f"KeyError: Missing key {e} for source '{source}', level '{level}'")
             message = "Incomplete log message due to missing data."
         
-        # Use "log.level" as the key (with a dot) for ES|QL compatibility.
         entries.append({
             "@timestamp": timestamp.isoformat() + "Z",
             "log.level": level,
@@ -304,9 +302,7 @@ def generate_saved_searches():
     now_str = now_iso
 
     saved_searches = []
-    for d in definitions:
-        panel_uuid = str(uuid.uuid4())
-        panel_ref = f"{panel_uuid}:panel_{panel_uuid}"
+    for i, d in enumerate(definitions, start=1):
         search_source = {
             "query": {"esql": d["query"]},
             "index": {
@@ -324,7 +320,7 @@ def generate_saved_searches():
             "filter": []
         }
         obj = {
-            "id": f"Discover_session_{len(saved_searches)+1}",
+            "id": f"Discover_session_{i}",
             "type": "search",
             "namespaces": ["default"],
             "updated_at": now_str,
@@ -350,18 +346,11 @@ def generate_saved_searches():
                     "to": now_iso
                 }
             },
-            "references": [
-                {
-                    "name": panel_ref,
-                    "type": "search",
-                    "id": f"Discover_session_{len(saved_searches)+1}"
-                }
-            ],
+            "references": [],
             "managed": False,
             "coreMigrationVersion": "8.9.0",
             "typeMigrationVersion": "8.9.0"
         }
-        obj["panelRefName"] = panel_ref
         saved_searches.append(obj)
     return saved_searches
 
@@ -370,7 +359,6 @@ def generate_lens_saved_object():
     now_iso = now_dt.isoformat() + "Z"
     created_by = "u_mGBROF_q5bmFCATbLXAcCwKa0k8JvONAwSruelyKA5E_0"
     version = "8.9.0"
-    # Use "state" instead of "lensState" to avoid strict dynamic mapping errors.
     lens_obj = {
         "id": "Sample_Lens_1",
         "type": "lens",
@@ -383,15 +371,11 @@ def generate_lens_saved_object():
         "attributes": {
             "title": "Sample Lens Visualization",
             "visualizationType": "lnsXY",
-            "state": {
-                "datasourceStates": {
-                    "textBased": {
-                        "layers": {}
-                    }
-                },
-                "visualization": {},
-                "query": {"query": "", "language": "kuery"},
-                "filters": []
+            "kibanaSavedObjectMeta": {
+                "searchSourceJSON": json.dumps({
+                    "filter": [],
+                    "query": {"query": "", "language": "kuery"}
+                })
             }
         },
         "references": [],
@@ -410,51 +394,53 @@ def generate_dashboard(saved_searches, lens_obj):
 
     panels = []
     references = []
-    # Arrange each Discover session in a 2-column grid.
-    for ss in saved_searches:
+    # Arrange Discover sessions in a 2-column grid.
+    for i, ss in enumerate(saved_searches, start=1):
+        col = 0 if i % 2 == 1 else 24
+        row = ((i - 1) // 2) * 15
+        panel_id = f"panel_{i}"
         panels.append({
             "type": "search",
             "title": ss["attributes"]["title"],
-            "panelRefName": ss["panelRefName"],
+            "panelRefName": panel_id,
             "embeddableConfig": {
                 "description": ss["attributes"]["description"]
             },
-            "panelIndex": ss["panelRefName"],
+            "panelIndex": panel_id,
             "gridData": {
-                "x": 0 if len(panels) % 2 == 0 else 24,
-                "y": (len(panels) // 2) * 15,
+                "x": col,
+                "y": row,
                 "w": 24,
                 "h": 15,
-                "i": ss["panelRefName"]
+                "i": panel_id
             }
         })
         references.append({
-            "name": ss["panelRefName"],
+            "name": panel_id,
             "type": "search",
             "id": ss["id"]
         })
-    # Create a unique panel for the Lens visualization by reference.
-    lens_uuid = str(uuid.uuid4())
-    lens_ref = f"{lens_uuid}:panel_{lens_uuid}"
+    # Add one Lens panel.
+    lens_panel_id = "panel_lens_1"
     panels.append({
         "type": "lens",
         "title": lens_obj["attributes"]["title"],
-        "panelRefName": lens_ref,
+        "panelRefName": lens_panel_id,
         "embeddableConfig": {
             "description": lens_obj["attributes"]["title"],
             "query": {"esql": "FROM unstructured-logs\n| sort @timestamp asc\n| eval week = DATE_TRUNC(1w, @timestamp) | stats count(*) by week"}
         },
-        "panelIndex": lens_ref,
+        "panelIndex": lens_panel_id,
         "gridData": {
             "x": 0,
-            "y": (len(saved_searches) // 2) * 15,
+            "y": ((len(saved_searches) + 1) // 2) * 15,
             "w": 48,
             "h": 15,
-            "i": lens_ref
+            "i": lens_panel_id
         }
     })
     references.append({
-        "name": lens_ref,
+        "name": lens_panel_id,
         "type": "lens",
         "id": lens_obj["id"]
     })

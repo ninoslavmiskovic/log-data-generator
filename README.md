@@ -88,6 +88,18 @@ The script will create a file named logs_dataset.csv in the current directory.
   -	source
   -	message 
 
+### Importing the Saved Objects
+To see your ES|QL queries in Kibana:
+
+1. Open Kibana and go to Management > Saved Objects.
+2. Import the NDJSON file (e.g., kibana_saved_searches.ndjson).
+```bash
+curl -X POST "http://localhost:5601/api/saved_objects/_import?overwrite=true" \
+     -H "kbn-xsrf: true" \
+     --form file=@output_saved_objects/kibana_saved_searches.ndjson
+```
+3. Open Discover, select one of the imported sessions, and run the ES|QL queries to analyze your unstructured logs.
+
 ### **5. Customization**
 
 #### **5.1. Adjust the Number of Log Entries**

@@ -1,18 +1,20 @@
 # Unstructured Log Data Generator
 
-This Python script generates a synthetic dataset of unstructured logs in CSV format, simulating logs from various services over a one-year period. The logs include different severity levels, sources, and detailed messages with dynamic content, suitable for testing, analysis, or demonstration purposes.
+This Python script generates a synthetic dataset of unstructured logs in CSV format, simulating logs from various services over a one-year period. The logs include different severity levels, sources, and detailed messages with dynamic content—suitable for testing, analysis, or demonstration purposes.
 
 ## Ensuring Unique Datasets on Each Execution
 
-Because the script relies on randomization without a fixed seed, every time you execute it:
-- New Log Entries: You’ll get a fresh set of log entries, with different timestamps, sources, levels, and messages.
-- Varied Data: Usernames, IP addresses, transaction details, and other data points will be unique.
-- Different Patterns: While the overall structure and patterns (like error spikes) remain consistent, the specific details and timing will change.
+Because the script relies on randomization without a fixed seed, each time you run it:
+
+- **New Log Entries:** You’ll get a fresh set of log entries with different timestamps, sources, levels, and messages.  
+- **Varied Data:** Usernames, IP addresses, transaction details, and other data points will be unique.  
+- **Different Patterns:** While the overall structure and patterns (like error spikes) remain consistent, the specific details and timing will vary.
 
 This behavior is beneficial for:
-- Testing: Allows you to test your log analysis tools or applications with varied data.
-- Simulation: Helps simulate real-world scenarios where log data is never the same.
-- Learning: Provides diverse datasets for practice in data analysis, machine learning, or cybersecurity.
+
+- **Testing:** Allows you to test your log analysis tools or applications with varied data.  
+- **Simulation:** Helps simulate real-world scenarios where log data is never the same.  
+- **Learning:** Provides diverse datasets for practice in data analysis, machine learning, or cybersecurity.
 
 ## Features
 
@@ -23,15 +25,17 @@ This behavior is beneficial for:
   - `NotificationService`
   - `CacheService`
 - **Generates over 10,000 log entries** with timestamps spanning the past year.
-- **Includes various log levels**:
+- **Includes various log levels:**
   - `INFO`
   - `WARN`
   - `ERROR`
   - `DEBUG`
 - **Introduces spikes and patterns** to mimic real-world scenarios:
-  - Error spikes occurring monthly.
+  - Monthly error spikes.
   - Security incidents and performance issues.
-- **Dynamic message content** using the [Faker](https://faker.readthedocs.io/en/master/) library for realistic data.
+- **Dynamic message content** powered by the [Faker](https://faker.readthedocs.io/en/master/) library for realistic data.
+- **Now Produces Discover Sessions (Saved Objects) with ES|QL Queries:**  
+  In addition to the CSV logs, the script can generate an NDJSON file containing Kibana Discover session objects that include ES|QL queries for analyzing the unstructured data.
 
 ## Requirements
 
@@ -40,9 +44,9 @@ This behavior is beneficial for:
 
 ## Installation
 
-### 1. Clone the Repository (If Applicable)
+### 1. Clone the Repository
 
-If you're using a GitHub repository:
+If you're using a GitHub repository, clone and navigate into it:
 
 ```bash
 git clone https://github.com/your-username/log-data-generator.git

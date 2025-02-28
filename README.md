@@ -162,8 +162,10 @@ Each time you run the script, it will generate a new CSV file with an incremente
 
 - **Output Files:**
 
-  - Files are named in the format `logs_dataset_0001.csv`, `logs_dataset_0002.csv`, etc.
+  - Files are named in the format `unstructured-logs-001.csv`, `unstructured-logs-002.csv`, etc.
   - Located in the `output_csv` directory.
+
+**INFO:** Make sure to name your index: ```unstructured-logs``` to make the ES|QL queries work properly. 
 
 ### **8. Troubleshooting**
 

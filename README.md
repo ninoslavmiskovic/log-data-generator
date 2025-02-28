@@ -45,7 +45,7 @@ This behavior is beneficial for:
 If you're using a GitHub repository:
 
 ```bash
-git clone https://github.com/your-username/log-data-generator.git
+git clone https://github.com/ninoslavmiskovic/log-data-generator.git
 cd log-data-generator
 ```
 

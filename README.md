@@ -96,7 +96,7 @@ To see your ES|QL queries in Kibana:
 ```bash
 curl -X POST "http://localhost:5601/api/saved_objects/_import?overwrite=true" \
      -H "kbn-xsrf: true" \
-     --form file=@output_saved_objects/kibana_saved_searches.ndjson
+     --form file=@output_saved_objects/kibana_saved_objects.ndjson
 ```
 3. Open Discover, select one of the imported sessions, and run the ES|QL queries to analyze your unstructured logs.
 

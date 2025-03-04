@@ -4,309 +4,227 @@ import datetime
 import os
 import json
 import uuid
+import requests
 from faker import Faker
 
 fake = Faker()
 
-# ------------------------------
-# Part 1: Generate CSV Logs
-# ------------------------------
+# -----------------------------------------------------------------
+# Elasticsearch & Kibana Configuration
+# -----------------------------------------------------------------
+ELASTICSEARCH_HOST = "http://localhost:9200"
+KIBANA_HOST = "http://localhost:5601" # add /xxx if you have a custom base path like in dev mode.
+ELASTICSEARCH_USER = "elastic"
+ELASTICSEARCH_PASS = "changeme"
+KIBANA_USER = "elastic"
+KIBANA_PASS = "changeme"
 
-# Define log.level values and sources
+# -----------------------------------------------------------------
+# 1) Generate Logs -> CSV
+# -----------------------------------------------------------------
 log_levels_list = ["INFO", "WARN", "ERROR", "DEBUG"]
 sources = ["AuthService", "PaymentService", "DatabaseService", "NotificationService", "CacheService"]
 
-# Log messages dictionary
 messages = {
     "AuthService": {
         "INFO": [
             "User '{user}' logged in successfully from IP address {ip_address}",
-            "Password reset initiated for user '{user}'; verification email sent",
+            "Password reset initiated for user '{user}'; verification email sent"
         ],
         "WARN": [
-            "Multiple failed login attempts detected for user '{user}'; account locked for 30 minutes",
+            "Multiple failed login attempts detected for user '{user}'; account locked for 30 minutes"
         ],
         "ERROR": [
             "Critical security vulnerability detected: unauthorized access attempt to admin panel from IP '{ip_address}'",
-            "Authentication service failed to validate token for user '{user}'",
+            "Authentication service failed to validate token for user '{user}'"
         ],
         "DEBUG": [
-            "Generated authentication token for session ID '{session_id}' with expiration time of 2 hours",
-            "Password hash generated using SHA-256 algorithm for user '{user}'",
-            "Session expired for user ID '{user_id}'; prompting re-authentication",
+            "Generated authentication token for session '{session_id}'",
+            "Password hash generated using SHA-256 algorithm for user '{user}'"
         ]
     },
-    "PaymentService": {
-        "INFO": [
-            "Refund processed for order ID '{order_id}'; amount refunded: ${amount}",
-            "Large volume of transactions processed: {transaction_count} transactions in the last hour",
-            "Payment completed successfully for transaction ID '{transaction_id}'",
-        ],
-        "WARN": [
-            "Payment processing delayed due to network latency exceeding {latency}ms threshold",
-            "Currency conversion rate not available for '{from_currency}' to '{to_currency}'; using last known rate",
-            "Suspicious transaction pattern detected for user '{user}'; flagging for manual review",
-        ],
-        "ERROR": [
-            "Transaction ID '{transaction_id}' declined due to insufficient funds in the user's account",
-            "Payment gateway error: {gateway_response}",
-        ],
-        "DEBUG": [
-            "Debugging payment flow for transaction ID '{transaction_id}'",
-            "Payment gateway response: {gateway_response}",
-        ]
-    },
-    "DatabaseService": {
-        "INFO": [
-            "Database query executed successfully: {query}",
-            "Backup completed successfully; backup file stored at '{backup_location}'",
-            "Connection established to database '{database_name}'",
-        ],
-        "WARN": [
-            "Disk space usage at {disk_usage}%; consider cleaning up old logs and backups",
-            "Slow query detected: {query}",
-        ],
-        "ERROR": [
-            "Timeout while executing query: {query}",
-            "Data corruption detected in '{table}' table; initiating recovery procedures",
-            "Failed to connect to database '{database_name}'",
-        ],
-        "DEBUG": [
-            "Executing query plan optimization for query: {query}",
-            "Connection pool status: {pool_status}",
-            "Database transaction started for session ID '{session_id}'",
-        ]
-    },
-    "NotificationService": {
-        "INFO": [
-            "Email notification sent to '{email}' regarding {subject}",
-            "Push notification sent to device ID '{device_id}' with message '{message_content}'",
-            "SMS sent to '{phone_number}' with message '{message_content}'",
-        ],
-        "WARN": [
-            "Email quota nearing limit; only {emails_remaining} emails remaining for the day",
-            "Delayed delivery of notifications due to high server load",
-        ],
-        "ERROR": [
-            "Failed to send SMS to '{phone_number}' due to {error_reason}",
-            "Email delivery failed to '{email}' due to SMTP server timeout",
-            "Notification service encountered an unexpected error: {error_reason}",
-        ],
-        "DEBUG": [
-            "SMTP server response: {smtp_response}",
-            "Notification queue size: {queue_size}",
-            "Notification payload: {notification_payload}",
-        ]
-    },
-    "CacheService": {
-        "INFO": [
-            "Cache updated for key '{cache_key}' after {update_reason}",
-            "Cache cleared for user ID '{user_id}'",
-        ],
-        "WARN": [
-            "Cache miss for key '{cache_key}'; fetching data from the database instead",
-            "High cache eviction rate detected",
-        ],
-        "ERROR": [
-            "Redis server not responding; attempting to reconnect in {retry_interval} seconds",
-            "Cache corruption detected; reinitializing cache",
-        ],
-        "DEBUG": [
-            "Cache eviction policy applied to key '{cache_key}'",
-            "Current cache size: {cache_size} items",
-            "Cache hit ratio: {cache_hit_ratio}%",
-        ]
-    },
+    # Add additional messages if desired for other services
 }
 
 def random_timestamp(start, end):
     return start + datetime.timedelta(seconds=random.randint(0, int((end - start).total_seconds())))
 
-def get_next_sequence_number(output_dir):
-    existing_files = [f for f in os.listdir(output_dir) if f.startswith("unstructured-logs-") and f.endswith(".csv")]
-    sequence_numbers = []
-    for filename in existing_files:
-        try:
-            seq_num = int(filename.replace("unstructured-logs-", "").replace(".csv", ""))
-            sequence_numbers.append(seq_num)
-        except ValueError:
-            continue
-    return max(sequence_numbers) + 1 if sequence_numbers else 1
-
-def generate_logs():
-    num_entries = 10000  # Adjust as needed
+def generate_logs(num_entries=1000):
+    """
+    Generates logs in memory, writes them to a CSV: unstructured-logs-001.csv.
+    Returns the list of doc dicts for ingestion.
+    """
     entries = []
     start_date = datetime.datetime.now() - datetime.timedelta(days=365)
     end_date = datetime.datetime.now()
-    error_spike_dates = [start_date + datetime.timedelta(days=30 * i) for i in range(1, 13)]
+    error_spike_dates = [start_date + datetime.timedelta(days=30*i) for i in range(1, 13)]
     
-    for i in range(num_entries):
+    for _ in range(num_entries):
         if random.random() < 0.05:
-            timestamp = random.choice(error_spike_dates) + datetime.timedelta(seconds=random.randint(0, 3600))
+            timestamp = (random.choice(error_spike_dates)
+                         + datetime.timedelta(seconds=random.randint(0, 3600)))
             level = "ERROR"
         else:
             timestamp = random_timestamp(start_date, end_date)
             level = random.choices(log_levels_list, weights=[0.7, 0.1, 0.1, 0.1])[0]
-            
+        
         source = random.choice(sources)
-        message_list = messages.get(source, {}).get(level, ["Generic log message"])
-        message_template = random.choice(message_list)
-        message_data = {
+        tmpl_list = messages.get(source, {}).get(level, ["Generic log message"])
+        tmpl = random.choice(tmpl_list)
+        
+        msg_data = {
             "user": fake.user_name(),
             "ip_address": fake.ipv4(),
-            "session_id": fake.uuid4(),
-            "user_id": random.randint(1000, 9999),
-            "order_id": random.randint(100000, 999999),
-            "amount": f"{random.uniform(10.0, 500.0):.2f}",
-            "transaction_count": random.randint(5000, 15000),
-            "latency": random.randint(200, 1000),
-            "from_currency": random.choice(["USD", "EUR", "GBP"]),
-            "to_currency": random.choice(["USD", "EUR", "GBP"]),
-            "transaction_id": random.randint(1000000, 9999999),
-            "gateway_response": fake.sentence(),
-            "query": fake.sentence(),
-            "backup_location": fake.file_path(),
-            "disk_usage": random.randint(80, 99),
-            "table": fake.word(),
-            "pool_status": fake.sentence(),
-            "email": fake.email(),
-            "subject": fake.sentence(),
-            "device_id": fake.uuid4(),
-            "message_content": fake.sentence(),
-            "emails_remaining": random.randint(10, 100),
-            "phone_number": fake.phone_number(),
-            "error_reason": fake.sentence(),
-            "smtp_response": fake.sentence(),
-            "queue_size": random.randint(0, 1000),
-            "cache_key": fake.word(),
-            "update_reason": fake.sentence(),
-            "retry_interval": random.randint(1, 10),
-            "cache_size": random.randint(1000, 10000),
-            "database_name": fake.word(),
-            "notification_payload": fake.json(),
-            "cache_hit_ratio": f"{random.uniform(50.0, 99.9):.1f}",
+            "session_id": fake.uuid4()
         }
         
         try:
-            message = message_template.format(**message_data)
-        except KeyError as e:
-            print(f"KeyError: Missing key {e} for source '{source}', level '{level}'")
-            message = "Incomplete log message due to missing data."
+            message = tmpl.format(**msg_data)
+        except KeyError:
+            message = "Incomplete log message."
         
-        entries.append({
+        doc = {
             "@timestamp": timestamp.isoformat() + "Z",
             "log.level": level,
             "source": source,
             "message": message
-        })
+        }
+        entries.append(doc)
     
+    # Sort & write CSV
     entries.sort(key=lambda x: x["@timestamp"])
-    output_dir = "output_csv"
-    os.makedirs(output_dir, exist_ok=True)
-    next_seq_num = get_next_sequence_number(output_dir)
-    filename = f"unstructured-logs-{next_seq_num:03d}.csv"
-    filepath = os.path.join(output_dir, filename)
-    with open(filepath, "w", newline="", encoding="utf-8") as csvfile:
+    os.makedirs("output_csv", exist_ok=True)
+    csv_path = os.path.join("output_csv", "unstructured-logs-001.csv")
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
         fieldnames = ["@timestamp", "log.level", "source", "message"]
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        for entry in entries:
-            writer.writerow(entry)
-    print(f"Dataset generated successfully! File saved as '{filepath}'")
+        for e in entries:
+            writer.writerow(e)
+    print(f"Generated logs -> {csv_path}")
+    return entries
 
-# ------------------------------
-# Part 2: Generate Saved Objects (Discover sessions, Lens, Dashboard)
-# ------------------------------
+# -----------------------------------------------------------------
+# 2) Ingest logs into Elasticsearch
+# -----------------------------------------------------------------
+def ingest_logs_to_es(docs):
+    index_url = f"{ELASTICSEARCH_HOST}/unstructured-logs"
+    resp = requests.put(
+        index_url,
+        auth=(ELASTICSEARCH_USER, ELASTICSEARCH_PASS),
+        headers={"Content-Type": "application/json"},
+        json={
+            "settings": {
+                "number_of_shards": 1,
+                "number_of_replicas": 0
+            },
+            "mappings": {
+                "properties": {
+                    "@timestamp": {"type": "date_nanos"},
+                    "log.level": {"type": "keyword"},
+                    "source": {"type": "keyword"},
+                    "message": {"type": "text"}
+                }
+            }
+        }
+    )
+    if resp.status_code not in (200, 400):
+        print("Index creation error:", resp.text)
+    else:
+        print("Index 'unstructured-logs' created or already exists.")
+    
+    # Bulk
+    bulk_data = []
+    for d in docs:
+        bulk_data.append(json.dumps({"index": {}}))
+        bulk_data.append(json.dumps(d))
+    bulk_body = "\n".join(bulk_data) + "\n"
+    
+    resp2 = requests.post(
+        f"{index_url}/_bulk",
+        auth=(ELASTICSEARCH_USER, ELASTICSEARCH_PASS),
+        headers={"Content-Type": "application/x-ndjson"},
+        data=bulk_body
+    )
+    if resp2.status_code == 200:
+        print("Logs successfully ingested into 'unstructured-logs'.")
+    else:
+        print("Bulk ingest error:", resp2.text)
 
-def generate_saved_searches():
-    definitions = [
+# -----------------------------------------------------------------
+# 3) Create Data View (Index Pattern) with ID='unstructured-logs'
+#    with Kibana 7.11-compatible migration versions
+# -----------------------------------------------------------------
+def create_data_view_so_7_11():
+    """
+    Returns a single saved object representing a data view (index-pattern)
+    with ID='unstructured-logs', timeFieldName=@timestamp,
+    using 7.11.0-compatible migration versions.
+    """
+    now_str = datetime.datetime.utcnow().isoformat() + "Z"
+    return {
+        "id": "unstructured-logs",
+        "type": "index-pattern",
+        "namespaces": ["default"],
+        "updated_at": now_str,
+        "created_at": now_str,
+        # NOTE: Avoid references if not needed
+        "version": "WzFd",
+        "attributes": {
+            "title": "unstructured-logs",
+            "timeFieldName": "@timestamp",
+            "fields": "[]"
+        },
+        "references": [],
+        "managed": False,
+        # Kibana 7.11-friendly migrations:
+        "coreMigrationVersion": "7.11.0",
+        "typeMigrationVersion": "7.11.0"
+    }
+
+# -----------------------------------------------------------------
+# 4) Generate Discover Sessions referencing that data view ID
+# -----------------------------------------------------------------
+def generate_discover_sessions_7_11():
+    """
+    Builds discover sessions referencing data view ID='unstructured-logs'
+    with Kibana 7.11-friendly migration versions.
+    """
+    now_str = datetime.datetime.utcnow().isoformat() + "Z"
+    one_year_ago_str = (datetime.datetime.utcnow() - datetime.timedelta(days=365)).isoformat() + "Z"
+    created_by = "u_mGBROF_q5bmFCATbLXAcCwKa0k8JvONAwSruelyKA5E_0"
+
+    session_defs = [
         {
             "title": "Retrieve All Logs",
-            "description": "Displays all logs sorted by timestamp in ascending order.",
-            "query": (
-                "FROM unstructured-logs\n"
-                "| sort @timestamp asc // sort logs by timestamp in ascending order"
-            ),
-            "columns": [],
-            "sort": []
+            "description": "All logs sorted ascending by @timestamp.",
+            "query": "FROM unstructured-logs\n| sort @timestamp asc"
         },
         {
             "title": "Count Logs by Level",
-            "description": "Counts the number of logs for each log level.",
+            "description": "Count logs grouped by log.level, sorted desc.",
             "query": (
                 "FROM unstructured-logs\n"
-                "| stats count_all = count() by log.level // count logs grouped by log.level\n"
-                "| sort count_all desc // sort counts in descending order"
-            ),
-            "columns": [],
-            "sort": []
+                "| stats count_all = count() by log.level\n"
+                "| sort count_all desc"
+            )
         },
         {
-            "title": "Count Logs by Source",
-            "description": "Counts the number of logs for each source.",
+            "title": "Error Logs",
+            "description": "Only logs with log.level == ERROR",
             "query": (
                 "FROM unstructured-logs\n"
-                "| stats count_all = count() by source // count logs grouped by source\n"
-                "| sort count_all desc // sort counts in descending order"
-            ),
-            "columns": ["count_all", "source"],
-            "sort": []
-        },
-        {
-            "title": "Retrieve Error Logs",
-            "description": "Shows error logs with timestamp, source, and message.",
-            "query": (
-                "FROM unstructured-logs\n"
-                "| where log.level == \"ERROR\" // filter for error logs\n"
-                "| sort @timestamp desc // sort logs by timestamp in descending order\n"
-                "| keep @timestamp, source, message // keep only timestamp, source, and message fields"
-            ),
-            "columns": [],
-            "sort": []
-        },
-        {
-            "title": "Parse AuthService Logs with Dissect",
-            "description": "Parses AuthService info logs using dissect to extract user and IP address.",
-            "query": (
-                "FROM unstructured-logs\n"
-                "| dissect message \"User '%{user}' logged in successfully from IP address %{ip_address}\" // extract user and ip_address using dissect\n"
-                "| where source == \"AuthService\" and log.level == \"INFO\" // filter for AuthService info logs\n"
-                "| sort @timestamp desc // sort logs by timestamp in descending order\n"
-                "| keep @timestamp, user, ip_address // keep only timestamp, user, and ip_address fields"
-            ),
-            "columns": [],
-            "sort": []
-        },
-        {
-            "title": "Parse AuthService Logs with Grok",
-            "description": "Parses AuthService info logs using grok to extract user and IP address.",
-            "query": (
-                "FROM unstructured-logs\n"
-                "| grok message \"User '%{USERNAME:user}' logged in successfully from IP address %{IP:ip_address}\" // extract user and ip_address using grok\n"
-                "| where source == \"AuthService\" and log.level == \"INFO\" // filter for AuthService info logs\n"
-                "| sort @timestamp desc // sort logs by timestamp in descending order\n"
-                "| keep @timestamp, user, ip_address // keep only timestamp, user, and ip_address fields"
-            ),
-            "columns": [],
-            "sort": []
+                "| where log.level == \"ERROR\"\n"
+                "| sort @timestamp desc"
+            )
         }
     ]
-    
-    now_dt = datetime.datetime.utcnow()
-    one_year_ago_dt = now_dt - datetime.timedelta(days=365)
-    now_iso = now_dt.isoformat() + "Z"
-    one_year_ago_iso = one_year_ago_dt.isoformat() + "Z"
-    
-    created_by = "u_mGBROF_q5bmFCATbLXAcCwKa0k8JvONAwSruelyKA5E_0"
-    version = "8.9.0"
-    now_str = now_iso
-
-    saved_searches = []
-    for i, d in enumerate(definitions, start=1):
+    so_list = []
+    for i, sdef in enumerate(session_defs, start=1):
         search_source = {
-            "query": {"esql": d["query"]},
+            "query": {"esql": sdef["query"]},
             "index": {
-                "id": "dbe3d33b8a15e80b61e4f52b8275675f49f957abaf82d186f114f1518eea4733",
+                "id": "unstructured-logs",  # data-view ID
                 "title": "unstructured-logs",
                 "timeFieldName": "@timestamp",
                 "sourceFilters": [],
@@ -319,7 +237,7 @@ def generate_saved_searches():
             },
             "filter": []
         }
-        obj = {
+        so_obj = {
             "id": f"Discover_session_{i}",
             "type": "search",
             "namespaces": ["default"],
@@ -327,13 +245,13 @@ def generate_saved_searches():
             "created_at": now_str,
             "created_by": created_by,
             "updated_by": created_by,
-            "version": version,
+            "version": "WzFd",
             "attributes": {
-                "title": d["title"],
-                "description": d["description"],
+                "title": sdef["title"],
+                "description": sdef["description"],
                 "hits": 0,
-                "columns": d["columns"],
-                "sort": d["sort"],
+                "columns": [],
+                "sort": [],
                 "kibanaSavedObjectMeta": {
                     "searchSourceJSON": json.dumps(search_source)
                 },
@@ -342,168 +260,71 @@ def generate_saved_searches():
                 "isTextBasedQuery": True,
                 "timeRestore": True,
                 "timeRange": {
-                    "from": one_year_ago_iso,
-                    "to": now_iso
+                    "from": one_year_ago_str,
+                    "to": now_str
                 }
             },
-            "references": [],
+            "references": [
+                {
+                    "name": "kibanaSavedObjectMeta.searchSourceJSON.index",
+                    "type": "index-pattern",
+                    "id": "unstructured-logs"
+                }
+            ],
             "managed": False,
-            "coreMigrationVersion": "8.9.0",
-            "typeMigrationVersion": "8.9.0"
+            # Set 7.11 versions
+            "coreMigrationVersion": "7.11.0",
+            "typeMigrationVersion": "7.11.0"
         }
-        saved_searches.append(obj)
-    return saved_searches
+        so_list.append(so_obj)
+    return so_list
 
-def generate_lens_saved_object():
-    now_dt = datetime.datetime.utcnow()
-    now_iso = now_dt.isoformat() + "Z"
-    created_by = "u_mGBROF_q5bmFCATbLXAcCwKa0k8JvONAwSruelyKA5E_0"
-    version = "8.9.0"
-    lens_obj = {
-        "id": "Sample_Lens_1",
-        "type": "lens",
-        "namespaces": ["default"],
-        "updated_at": now_iso,
-        "created_at": now_iso,
-        "created_by": created_by,
-        "updated_by": created_by,
-        "version": version,
-        "attributes": {
-            "title": "Sample Lens Visualization",
-            "visualizationType": "lnsXY",
-            "kibanaSavedObjectMeta": {
-                "searchSourceJSON": json.dumps({
-                    "filter": [],
-                    "query": {"query": "", "language": "kuery"}
-                })
-            }
-        },
-        "references": [],
-        "managed": False,
-        "coreMigrationVersion": "8.9.0",
-        "typeMigrationVersion": "8.9.0"
-    }
-    return lens_obj
-
-def generate_dashboard(saved_searches, lens_obj):
-    now_dt = datetime.datetime.utcnow()
-    now_iso = now_dt.isoformat() + "Z"
-    created_by = "u_mGBROF_q5bmFCATbLXAcCwKa0k8JvONAwSruelyKA5E_0"
-    version = "8.9.0"
-    dashboard_id = str(uuid.uuid4())
-
-    panels = []
-    references = []
-    # Arrange Discover sessions in a 2-column grid.
-    for i, ss in enumerate(saved_searches, start=1):
-        col = 0 if i % 2 == 1 else 24
-        row = ((i - 1) // 2) * 15
-        panel_id = f"panel_{i}"
-        panels.append({
-            "type": "search",
-            "title": ss["attributes"]["title"],
-            "panelRefName": panel_id,
-            "embeddableConfig": {
-                "description": ss["attributes"]["description"]
-            },
-            "panelIndex": panel_id,
-            "gridData": {
-                "x": col,
-                "y": row,
-                "w": 24,
-                "h": 15,
-                "i": panel_id
-            }
-        })
-        references.append({
-            "name": panel_id,
-            "type": "search",
-            "id": ss["id"]
-        })
-    # Add one Lens panel.
-    lens_panel_id = "panel_lens_1"
-    panels.append({
-        "type": "lens",
-        "title": lens_obj["attributes"]["title"],
-        "panelRefName": lens_panel_id,
-        "embeddableConfig": {
-            "description": lens_obj["attributes"]["title"],
-            "query": {"esql": "FROM unstructured-logs\n| sort @timestamp asc\n| eval week = DATE_TRUNC(1w, @timestamp) | stats count(*) by week"}
-        },
-        "panelIndex": lens_panel_id,
-        "gridData": {
-            "x": 0,
-            "y": ((len(saved_searches) + 1) // 2) * 15,
-            "w": 48,
-            "h": 15,
-            "i": lens_panel_id
-        }
-    })
-    references.append({
-        "name": lens_panel_id,
-        "type": "lens",
-        "id": lens_obj["id"]
-    })
+# -----------------------------------------------------------------
+# 5) Write NDJSON & Import (multipart/form-data)
+# -----------------------------------------------------------------
+def write_and_import_so(data_view_obj, discover_objs):
+    os.makedirs("output_saved_objects", exist_ok=True)
+    ndjson_path = os.path.join("output_saved_objects", "kibana_saved_objects.ndjson")
     
-    dashboard_obj = {
-        "id": dashboard_id,
-        "type": "dashboard",
-        "namespaces": ["default"],
-        "updated_at": now_iso,
-        "created_at": now_iso,
-        "created_by": created_by,
-        "updated_by": created_by,
-        "version": version,
-        "attributes": {
-            "version": 3,
-            "description": "",
-            "refreshInterval": {"pause": True, "value": 60000},
-            "timeRestore": True,
-            "timeFrom": "now-1y",
-            "timeTo": "now",
-            "title": "Dashboard_example_with_all_ES|QL_panels",
-            "controlGroupInput": {},
-            "optionsJSON": json.dumps({
-                "useMargins": True,
-                "syncColors": False,
-                "syncCursor": True,
-                "syncTooltips": False,
-                "hidePanelTitles": False
-            }),
-            "panelsJSON": json.dumps(panels),
-            "kibanaSavedObjectMeta": {
-                "searchSourceJSON": json.dumps({"filter": [], "query": {"query": "", "language": "kuery"}})
-            }
-        },
-        "references": references,
-        "managed": False,
-        "coreMigrationVersion": "8.9.0",
-        "typeMigrationVersion": "8.9.0"
-    }
-    return dashboard_obj
-
-def write_saved_objects():
-    saved_searches = generate_saved_searches()
-    lens_obj = generate_lens_saved_object()
-    dashboard_obj = generate_dashboard(saved_searches, lens_obj)
-    
-    all_objects = []
-    all_objects.extend(saved_searches)
-    all_objects.append(lens_obj)
-    all_objects.append(dashboard_obj)
-    
-    output_dir = "output_saved_objects"
-    os.makedirs(output_dir, exist_ok=True)
-    filepath = os.path.join(output_dir, "kibana_saved_objects.ndjson")
-    with open(filepath, "w", encoding="utf-8") as f:
-        for obj in all_objects:
+    all_objs = [data_view_obj] + discover_objs
+    with open(ndjson_path, "w", encoding="utf-8") as f:
+        for obj in all_objs:
             f.write(json.dumps(obj) + "\n")
-    print(f"Kibana Saved Objects generated successfully! File saved as '{filepath}'")
+    print(f"Saved data view + discover sessions -> {ndjson_path}")
 
-# ------------------------------
+    # Import
+    with open(ndjson_path, "rb") as f:
+        files = {
+            # Let requests pick the form boundary,
+            # do not explicitly set "application/ndjson"
+            "file": ("kibana_saved_objects.ndjson", f)
+        }
+        resp = requests.post(
+            f"{KIBANA_HOST}/api/saved_objects/_import?overwrite=true",
+            auth=(KIBANA_USER, KIBANA_PASS),
+            headers={"kbn-xsrf": "true"},
+            files=files
+        )
+    if resp.status_code == 200:
+        print("Data view + discover sessions imported into Kibana 7.11!")
+    else:
+        print(f"Import error: {resp.status_code} => {resp.text}")
+
+# -----------------------------------------------------------------
 # Main
-# ------------------------------
-
+# -----------------------------------------------------------------
 if __name__ == "__main__":
-    generate_logs()
-    write_saved_objects()
+    # 1) Generate logs -> CSV
+    docs = generate_logs(num_entries=500)
+
+    # 2) Ingest logs into ES
+    ingest_logs_to_es(docs)
+
+    # 3) Build data view object with 7.11-friendly versions
+    data_view_so = create_data_view_so_7_11()
+
+    # 4) Build discover sessions referencing that data view
+    discover_sos = generate_discover_sessions_7_11()
+
+    # 5) Write NDJSON + import
+    write_and_import_so(data_view_so, discover_sos)

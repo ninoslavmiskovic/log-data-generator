@@ -13,7 +13,7 @@ fake = Faker()
 # Elasticsearch & Kibana Configuration
 # -----------------------------------------------------------------
 ELASTICSEARCH_HOST = "http://localhost:9200"
-KIBANA_HOST = "http://localhost:5601" # add /xxx if you have a custom base path like in dev mode.
+KIBANA_HOST = "http://localhost:5601" # add /xxx if you have a custom base path like in dev mode. e.g http://localhost:5601/pga  
 ELASTICSEARCH_USER = "elastic"
 ELASTICSEARCH_PASS = "changeme"
 KIBANA_USER = "elastic"

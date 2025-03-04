@@ -49,7 +49,7 @@ This behavior is beneficial for:
 If you're using a GitHub repository, clone and navigate into it:
 
 ```bash
-git clone https://github.com/your-username/log-data-generator.git
+git clone https://github.com/ninoslavmiskovic/log-data-generator.git
 cd log-data-generator
 ```
 
@@ -91,6 +91,18 @@ The script will create a file named logs_dataset.csv in the current directory.
   -	log.level
   -	source
   -	message 
+
+### Importing the Saved Objects
+To see your ES|QL queries in Kibana:
+
+1. Open Kibana and go to Management > Saved Objects.
+2. Import the NDJSON file (e.g., kibana_saved_searches.ndjson).
+```bash
+curl -X POST "http://localhost:5601/api/saved_objects/_import?overwrite=true" \
+     -H "kbn-xsrf: true" \
+     --form file=@output_saved_objects/kibana_saved_objects.ndjson
+```
+3. Open Discover, select one of the imported sessions, and run the ES|QL queries to analyze your unstructured logs.
 
 ### **5. Customization**
 
@@ -154,8 +166,10 @@ Each time you run the script, it will generate a new CSV file with an incremente
 
 - **Output Files:**
 
-  - Files are named in the format `logs_dataset_0001.csv`, `logs_dataset_0002.csv`, etc.
+  - Files are named in the format `unstructured-logs-001.csv`, `unstructured-logs-002.csv`, etc.
   - Located in the `output_csv` directory.
+
+**INFO:** Make sure to name your index: ```unstructured-logs``` to make the ES|QL queries work properly. 
 
 ### **8. Troubleshooting**
 

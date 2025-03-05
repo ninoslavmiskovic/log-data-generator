@@ -9,19 +9,19 @@ from faker import Faker
 
 fake = Faker()
 
-# -----------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Elasticsearch & Kibana Configuration
-# -----------------------------------------------------------------
+# ------------------------------------------------------------------------------
 ELASTICSEARCH_HOST = "http://localhost:9200"
-KIBANA_HOST = "http://localhost:5601" # add /xxx if you have a custom base path like in dev mode. e.g http://localhost:5601/pga  
+KIBANA_HOST = "http://localhost:5601/pga"  # Adjust if Kibana is under a path (e.g., /pga)
 ELASTICSEARCH_USER = "elastic"
 ELASTICSEARCH_PASS = "changeme"
 KIBANA_USER = "elastic"
 KIBANA_PASS = "changeme"
 
-# -----------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # 1) Generate Logs -> CSV
-# -----------------------------------------------------------------
+# ------------------------------------------------------------------------------
 log_levels_list = ["INFO", "WARN", "ERROR", "DEBUG"]
 sources = ["AuthService", "PaymentService", "DatabaseService", "NotificationService", "CacheService"]
 
@@ -43,7 +43,27 @@ messages = {
             "Password hash generated using SHA-256 algorithm for user '{user}'"
         ]
     },
-    # Add additional messages if desired for other services
+    "PaymentService": {
+        "INFO": [
+            "Refund processed for order ID '{order_id}'; amount refunded: ${amount}",
+            "Large volume of transactions processed: {transaction_count} transactions in the last hour",
+            "Payment completed successfully for transaction ID '{transaction_id}'"
+        ],
+        "WARN": [
+            "Payment processing delayed due to network latency exceeding {latency}ms threshold",
+            "Currency conversion rate not available for '{from_currency}' to '{to_currency}'",
+            "Suspicious transaction pattern detected for user '{user}'"
+        ],
+        "ERROR": [
+            "Transaction ID '{transaction_id}' declined due to insufficient funds",
+            "Payment gateway error: {gateway_response}"
+        ],
+        "DEBUG": [
+            "Debugging payment flow for transaction ID '{transaction_id}'",
+            "Payment gateway response: {gateway_response}"
+        ]
+    },
+    # Additional definitions for DatabaseService, NotificationService, CacheService can be added similarly.
 }
 
 def random_timestamp(start, end):
@@ -51,18 +71,17 @@ def random_timestamp(start, end):
 
 def generate_logs(num_entries=1000):
     """
-    Generates logs in memory, writes them to a CSV: unstructured-logs-001.csv.
-    Returns the list of doc dicts for ingestion.
+    Generates log docs in memory, writes them to CSV,
+    and returns a list of doc dicts for ingestion.
     """
     entries = []
     start_date = datetime.datetime.now() - datetime.timedelta(days=365)
     end_date = datetime.datetime.now()
-    error_spike_dates = [start_date + datetime.timedelta(days=30*i) for i in range(1, 13)]
+    error_spike_dates = [start_date + datetime.timedelta(days=30 * i) for i in range(1, 13)]
     
     for _ in range(num_entries):
         if random.random() < 0.05:
-            timestamp = (random.choice(error_spike_dates)
-                         + datetime.timedelta(seconds=random.randint(0, 3600)))
+            timestamp = random.choice(error_spike_dates) + datetime.timedelta(seconds=random.randint(0, 3600))
             level = "ERROR"
         else:
             timestamp = random_timestamp(start_date, end_date)
@@ -91,7 +110,6 @@ def generate_logs(num_entries=1000):
         }
         entries.append(doc)
     
-    # Sort & write CSV
     entries.sort(key=lambda x: x["@timestamp"])
     os.makedirs("output_csv", exist_ok=True)
     csv_path = os.path.join("output_csv", "unstructured-logs-001.csv")
@@ -104,9 +122,9 @@ def generate_logs(num_entries=1000):
     print(f"Generated logs -> {csv_path}")
     return entries
 
-# -----------------------------------------------------------------
-# 2) Ingest logs into Elasticsearch
-# -----------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# 2) Ingest Logs into Elasticsearch
+# ------------------------------------------------------------------------------
 def ingest_logs_to_es(docs):
     index_url = f"{ELASTICSEARCH_HOST}/unstructured-logs"
     resp = requests.put(
@@ -131,9 +149,8 @@ def ingest_logs_to_es(docs):
     if resp.status_code not in (200, 400):
         print("Index creation error:", resp.text)
     else:
-        print("Index 'unstructured-logs' created or already exists.")
+        print("Index 'unstructured-logs' created or exists.")
     
-    # Bulk
     bulk_data = []
     for d in docs:
         bulk_data.append(json.dumps({"index": {}}))
@@ -151,16 +168,10 @@ def ingest_logs_to_es(docs):
     else:
         print("Bulk ingest error:", resp2.text)
 
-# -----------------------------------------------------------------
-# 3) Create Data View (Index Pattern) with ID='unstructured-logs'
-#    with Kibana 7.11-compatible migration versions
-# -----------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# 3) Create Data View (Index Pattern) Saved Object with ID 'unstructured-logs'
+# ------------------------------------------------------------------------------
 def create_data_view_so_7_11():
-    """
-    Returns a single saved object representing a data view (index-pattern)
-    with ID='unstructured-logs', timeFieldName=@timestamp,
-    using 7.11.0-compatible migration versions.
-    """
     now_str = datetime.datetime.utcnow().isoformat() + "Z"
     return {
         "id": "unstructured-logs",
@@ -168,7 +179,6 @@ def create_data_view_so_7_11():
         "namespaces": ["default"],
         "updated_at": now_str,
         "created_at": now_str,
-        # NOTE: Avoid references if not needed
         "version": "WzFd",
         "attributes": {
             "title": "unstructured-logs",
@@ -177,54 +187,64 @@ def create_data_view_so_7_11():
         },
         "references": [],
         "managed": False,
-        # Kibana 7.11-friendly migrations:
         "coreMigrationVersion": "7.11.0",
         "typeMigrationVersion": "7.11.0"
     }
 
-# -----------------------------------------------------------------
-# 4) Generate Discover Sessions referencing that data view ID
-# -----------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# 4) Generate Discover Sessions with DISSECT & GROK, plus others
+# ------------------------------------------------------------------------------
 def generate_discover_sessions_7_11():
-    """
-    Builds discover sessions referencing data view ID='unstructured-logs'
-    with Kibana 7.11-friendly migration versions.
-    """
     now_str = datetime.datetime.utcnow().isoformat() + "Z"
     one_year_ago_str = (datetime.datetime.utcnow() - datetime.timedelta(days=365)).isoformat() + "Z"
     created_by = "u_mGBROF_q5bmFCATbLXAcCwKa0k8JvONAwSruelyKA5E_0"
-
+    
+    # Definitions for 6 discover sessions
     session_defs = [
         {
             "title": "Retrieve All Logs",
             "description": "All logs sorted ascending by @timestamp.",
-            "query": "FROM unstructured-logs\n| sort @timestamp asc"
+            "query": "FROM unstructured-logs\n| sort @timestamp asc",
+            "columns": ["@timestamp", "log.level", "source", "message"]
         },
         {
             "title": "Count Logs by Level",
-            "description": "Count logs grouped by log.level, sorted desc.",
-            "query": (
-                "FROM unstructured-logs\n"
-                "| stats count_all = count() by log.level\n"
-                "| sort count_all desc"
-            )
+            "description": "Count logs grouped by log.level, sorted descending.",
+            "query": "FROM unstructured-logs\n| stats count_all = count() by log.level\n| sort count_all desc",
+            "columns": ["log.level", "count_all"]
         },
         {
-            "title": "Error Logs",
-            "description": "Only logs with log.level == ERROR",
-            "query": (
-                "FROM unstructured-logs\n"
-                "| where log.level == \"ERROR\"\n"
-                "| sort @timestamp desc"
-            )
+            "title": "Count Logs by Source",
+            "description": "Count logs grouped by source, sorted descending.",
+            "query": "FROM unstructured-logs\n| stats count_all = count() by source\n| sort count_all desc",
+            "columns": ["source", "count_all"]
+        },
+        {
+            "title": "Retrieve Error Logs",
+            "description": "Logs with log.level == ERROR, sorted descending, keeping specific fields.",
+            "query": "FROM unstructured-logs\n| where log.level == \"ERROR\"\n| sort @timestamp desc\n| keep @timestamp, source, message",
+            "columns": ["@timestamp", "source", "message"]
+        },
+        {
+            "title": "Parse AuthService Logs with Dissect",
+            "description": "Extracts user and IP address from AuthService logs using dissect.",
+            "query": "FROM unstructured-logs\n| dissect message \"User '%{user}' logged in successfully from IP address %{ip_address}\"\n| where source == \"AuthService\" and log.level == \"INFO\"\n| sort @timestamp desc\n| keep @timestamp, user, ip_address",
+            "columns": ["@timestamp", "user", "ip_address"]
+        },
+        {
+            "title": "Parse AuthService Logs with Grok",
+            "description": "Extracts user and IP address from AuthService logs using grok.",
+            "query": "FROM unstructured-logs\n| grok message \"User '%{USERNAME:user}' logged in successfully from IP address %{IP:ip_address}\"\n| where source == \"AuthService\" and log.level == \"INFO\"\n| sort @timestamp desc\n| keep @timestamp, user, ip_address",
+            "columns": ["@timestamp", "user", "ip_address"]
         }
     ]
-    so_list = []
+    
+    sessions = []
     for i, sdef in enumerate(session_defs, start=1):
         search_source = {
             "query": {"esql": sdef["query"]},
             "index": {
-                "id": "unstructured-logs",  # data-view ID
+                "id": "unstructured-logs",
                 "title": "unstructured-logs",
                 "timeFieldName": "@timestamp",
                 "sourceFilters": [],
@@ -237,7 +257,7 @@ def generate_discover_sessions_7_11():
             },
             "filter": []
         }
-        so_obj = {
+        so = {
             "id": f"Discover_session_{i}",
             "type": "search",
             "namespaces": ["default"],
@@ -250,7 +270,7 @@ def generate_discover_sessions_7_11():
                 "title": sdef["title"],
                 "description": sdef["description"],
                 "hits": 0,
-                "columns": [],
+                "columns": sdef["columns"],
                 "sort": [],
                 "kibanaSavedObjectMeta": {
                     "searchSourceJSON": json.dumps(search_source)
@@ -272,16 +292,15 @@ def generate_discover_sessions_7_11():
                 }
             ],
             "managed": False,
-            # Set 7.11 versions
             "coreMigrationVersion": "7.11.0",
             "typeMigrationVersion": "7.11.0"
         }
-        so_list.append(so_obj)
-    return so_list
+        sessions.append(so)
+    return sessions
 
-# -----------------------------------------------------------------
-# 5) Write NDJSON & Import (multipart/form-data)
-# -----------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# 5) Write NDJSON & Import into Kibana using Saved Objects API
+# ------------------------------------------------------------------------------
 def write_and_import_so(data_view_obj, discover_objs):
     os.makedirs("output_saved_objects", exist_ok=True)
     ndjson_path = os.path.join("output_saved_objects", "kibana_saved_objects.ndjson")
@@ -290,13 +309,10 @@ def write_and_import_so(data_view_obj, discover_objs):
     with open(ndjson_path, "w", encoding="utf-8") as f:
         for obj in all_objs:
             f.write(json.dumps(obj) + "\n")
-    print(f"Saved data view + discover sessions -> {ndjson_path}")
-
-    # Import
+    print(f"Saved objects NDJSON written to {ndjson_path}")
+    
     with open(ndjson_path, "rb") as f:
         files = {
-            # Let requests pick the form boundary,
-            # do not explicitly set "application/ndjson"
             "file": ("kibana_saved_objects.ndjson", f)
         }
         resp = requests.post(
@@ -306,25 +322,25 @@ def write_and_import_so(data_view_obj, discover_objs):
             files=files
         )
     if resp.status_code == 200:
-        print("Data view + discover sessions imported into Kibana 7.11!")
+        print("Data view and discover sessions imported into Kibana!")
     else:
-        print(f"Import error: {resp.status_code} => {resp.text}")
+        print(f"Error importing NDJSON: {resp.status_code} -> {resp.text}")
 
-# -----------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Main
-# -----------------------------------------------------------------
+# ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    # 1) Generate logs -> CSV
-    docs = generate_logs(num_entries=500)
+    # 1) Generate logs and write CSV
+    docs = generate_logs(num_entries=1000)
 
-    # 2) Ingest logs into ES
+    # 2) Ingest logs into Elasticsearch
     ingest_logs_to_es(docs)
 
-    # 3) Build data view object with 7.11-friendly versions
+    # 3) Create data view saved object with ID 'unstructured-logs'
     data_view_so = create_data_view_so_7_11()
 
-    # 4) Build discover sessions referencing that data view
+    # 4) Generate Discover Sessions referencing the data view ID 'unstructured-logs'
     discover_sos = generate_discover_sessions_7_11()
 
-    # 5) Write NDJSON + import
+    # 5) Write NDJSON and import via Kibana's Saved Objects API
     write_and_import_so(data_view_so, discover_sos)

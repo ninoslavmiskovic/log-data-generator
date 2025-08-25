@@ -69,7 +69,7 @@ messages = {
 def random_timestamp(start, end):
     return start + datetime.timedelta(seconds=random.randint(0, int((end - start).total_seconds())))
 
-def generate_logs(num_entries=1000):
+def generate_logs(num_entries=10000000000000):
     """
     Generates log docs in memory, writes them to CSV,
     and returns a list of doc dicts for ingestion.
@@ -78,30 +78,30 @@ def generate_logs(num_entries=1000):
     start_date = datetime.datetime.now() - datetime.timedelta(days=365)
     end_date = datetime.datetime.now()
     error_spike_dates = [start_date + datetime.timedelta(days=30 * i) for i in range(1, 13)]
-    
+
     for _ in range(num_entries):
-        if random.random() < 0.05:
+        if random.random() < 0.10:
             timestamp = random.choice(error_spike_dates) + datetime.timedelta(seconds=random.randint(0, 3600))
             level = "ERROR"
         else:
             timestamp = random_timestamp(start_date, end_date)
             level = random.choices(log_levels_list, weights=[0.7, 0.1, 0.1, 0.1])[0]
-        
+
         source = random.choice(sources)
         tmpl_list = messages.get(source, {}).get(level, ["Generic log message"])
         tmpl = random.choice(tmpl_list)
-        
+
         msg_data = {
             "user": fake.user_name(),
             "ip_address": fake.ipv4(),
             "session_id": fake.uuid4()
         }
-        
+
         try:
             message = tmpl.format(**msg_data)
         except KeyError:
             message = "Incomplete log message."
-        
+
         doc = {
             "@timestamp": timestamp.isoformat() + "Z",
             "log.level": level,
@@ -109,7 +109,7 @@ def generate_logs(num_entries=1000):
             "message": message
         }
         entries.append(doc)
-    
+
     entries.sort(key=lambda x: x["@timestamp"])
     os.makedirs("output_csv", exist_ok=True)
     csv_path = os.path.join("output_csv", "unstructured-logs-001.csv")

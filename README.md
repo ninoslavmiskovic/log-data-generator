@@ -115,9 +115,9 @@ The script will create a file named logs_dataset.csv in the current directory.
 
 - The dataset will contain log entries with the following fields:
   - @timestamp
-  -	log.level
-  -	source
-  -	message 
+  -\tlog.level
+  -\tsource
+  -\tmessage 
 
 ### Importing the Saved Objects Manually (Optional)
 If needed, you can manually import the NDJSON file:
@@ -210,7 +210,6 @@ pip install Faker
 ```
 - If Python 3 is not installed, install it via Homebrew or from the official website: https://www.python.org/downloads/
 
----
 
 ### 9. Contributing
 

@@ -11,37 +11,42 @@ To complete the documentation, please add the following screenshots:
 - **Key elements:** Navigation bar, welcome cards, current configuration panel, features list
 - **Description:** Shows the clean, modern interface and main entry points
 
-### 2. `configuration-screen.png`
+### 2. `data-type-selection.png`
+- **What to capture:** Generate page showing the data type selection grid at http://localhost:8080/generate
+- **Key elements:** 8 data type cards with icons, selected state, and interactive hover effects
+- **Description:** Shows the comprehensive data type selection interface
+
+### 3. `configuration-screen.png`
 - **What to capture:** Settings page at http://localhost:8080/config
 - **Key elements:** Elasticsearch config, Kibana config, log generation settings, test connections button
 - **Description:** Demonstrates the easy-to-use configuration interface
 
-### 3. `settings-flow.png`
+### 4. `settings-flow.png`
 - **What to capture:** Settings page with connection test results visible
 - **Key elements:** Filled-in configuration forms, test connection results showing success/failure
 - **Description:** Shows the step-by-step configuration process
 
-### 4. `generation-process.png`
+### 5. `generation-process.png`
 - **What to capture:** Progress page during log generation at http://localhost:8080/progress/[operation-id]
 - **Key elements:** Progress bar, status messages, timeline of operations
 - **Description:** Real-time progress tracking interface
 
-### 5. `kibana-integration.png`
+### 6. `kibana-integration.png`
 - **What to capture:** Kibana Discover page showing the pre-built saved searches
 - **Key elements:** Discover sessions list, one of the ES|QL queries, data preview
 - **Description:** Shows the automatically created Kibana objects
 
-### 6. `discover-sessions.png`
+### 7. `discover-sessions.png`
 - **What to capture:** Kibana showing one of the DISSECT or GROK parsing examples
 - **Key elements:** ES|QL query with parsing, results showing extracted fields
 - **Description:** Demonstrates the advanced parsing capabilities
 
-### 7. `configuration-options.png`
+### 8. `configuration-options.png`
 - **What to capture:** Settings page showing all configuration sections expanded
 - **Key elements:** All form fields visible, help text, validation messages
 - **Description:** Comprehensive view of all available settings
 
-### 8. `progress-tracking.png`
+### 9. `progress-tracking.png`
 - **What to capture:** Progress page showing completed operation with timeline
 - **Key elements:** 100% progress bar, success message, timeline of all steps, action buttons
 - **Description:** Shows successful completion of the generation process

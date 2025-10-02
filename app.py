@@ -9,11 +9,12 @@ import threading
 import uuid
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# Import the log generation functions
+# Import the log generation functions and data generators
 from generate_logs import (
-    generate_logs, ingest_logs_to_es, create_data_view_so_7_11,
+    ingest_logs_to_es, create_data_view_so_7_11,
     generate_discover_sessions_7_11, write_and_import_so
 )
+from data_generators import DATA_GENERATORS
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
@@ -116,18 +117,23 @@ def generate():
     if request.method == 'POST':
         try:
             num_entries = int(request.form.get('num_entries', config['log_generation']['default_entries']))
+            data_type = request.form.get('data_type', 'unstructured_logs')
             generate_csv = request.form.get('generate_csv') == 'on'
             ingest_to_es = request.form.get('ingest_to_es') == 'on'
             create_kibana_objects = request.form.get('create_kibana_objects') == 'on'
             
             if num_entries > config['log_generation']['max_entries']:
                 flash(f'Number of entries cannot exceed {config["log_generation"]["max_entries"]}', 'error')
-                return render_template('generate.html', config=config)
+                return render_template('generate.html', config=config, data_generators=DATA_GENERATORS)
+            
+            if data_type not in DATA_GENERATORS:
+                flash('Invalid data type selected', 'error')
+                return render_template('generate.html', config=config, data_generators=DATA_GENERATORS)
             
             # Start background task
             operation_id = str(uuid.uuid4())
             thread = threading.Thread(target=run_log_generation, args=(
-                operation_id, num_entries, generate_csv, ingest_to_es, create_kibana_objects, config
+                operation_id, num_entries, data_type, generate_csv, ingest_to_es, create_kibana_objects, config
             ))
             thread.start()
             
@@ -137,7 +143,7 @@ def generate():
         except Exception as e:
             flash(f'Error starting log generation: {str(e)}', 'error')
     
-    return render_template('generate.html', config=config)
+    return render_template('generate.html', config=config, data_generators=DATA_GENERATORS)
 
 @app.route('/progress/<operation_id>')
 def progress(operation_id):
@@ -195,10 +201,10 @@ def test_connection():
     
     return jsonify(results)
 
-def run_log_generation(operation_id, num_entries, generate_csv, ingest_to_es, create_kibana_objects, config):
+def run_log_generation(operation_id, num_entries, data_type, generate_csv, ingest_to_es, create_kibana_objects, config):
     """Background task for log generation"""
     try:
-        update_operation_status(operation_id, 'running', 'Starting log generation...', 0)
+        update_operation_status(operation_id, 'running', 'Starting data generation...', 0)
         
         # Set global configuration for the generate_logs module
         import generate_logs
@@ -209,30 +215,277 @@ def run_log_generation(operation_id, num_entries, generate_csv, ingest_to_es, cr
         generate_logs.KIBANA_USER = config['kibana']['username']
         generate_logs.KIBANA_PASS = config['kibana']['password']
         
-        # Step 1: Generate logs
-        update_operation_status(operation_id, 'running', 'Generating log data...', 10)
-        docs = generate_logs.generate_logs(num_entries)
+        # Step 1: Generate data
+        update_operation_status(operation_id, 'running', f'Generating {DATA_GENERATORS[data_type]["name"]} data...', 10)
         
-        update_operation_status(operation_id, 'running', f'Generated {len(docs)} log entries', 30)
+        # Initialize the appropriate generator
+        generator_class = DATA_GENERATORS[data_type]['generator']
+        generator = generator_class()
         
-        # Step 2: Ingest to Elasticsearch (if requested)
+        # Generate data entries
+        entries = []
+        for i in range(num_entries):
+            if i % 1000 == 0:  # Update progress every 1000 entries
+                progress = 10 + (i / num_entries) * 20  # 10-30% for generation
+                update_operation_status(operation_id, 'running', f'Generated {i}/{num_entries} entries...', progress)
+            
+            entry = generator.generate_entry()
+            entries.append(entry)
+        
+        update_operation_status(operation_id, 'running', f'Generated {len(entries)} {DATA_GENERATORS[data_type]["name"]} entries', 30)
+        
+        # Step 2: Write CSV file (if requested)
+        if generate_csv:
+            update_operation_status(operation_id, 'running', 'Writing CSV file...', 35)
+            csv_path = write_csv_file(entries, data_type)
+            update_operation_status(operation_id, 'running', f'CSV file written to {csv_path}', 45)
+        
+        # Step 3: Ingest to Elasticsearch (if requested)
         if ingest_to_es:
-            update_operation_status(operation_id, 'running', 'Ingesting logs to Elasticsearch...', 50)
-            generate_logs.ingest_logs_to_es(docs)
-            update_operation_status(operation_id, 'running', 'Logs ingested successfully', 70)
+            update_operation_status(operation_id, 'running', 'Ingesting data to Elasticsearch...', 50)
+            index_name = DATA_GENERATORS[data_type]['index_pattern']
+            ingest_data_to_es(entries, index_name, data_type, config)
+            update_operation_status(operation_id, 'running', 'Data ingested successfully', 70)
         
-        # Step 3: Create Kibana objects (if requested)
+        # Step 4: Create Kibana objects (if requested)
         if create_kibana_objects:
             update_operation_status(operation_id, 'running', 'Creating Kibana saved objects...', 80)
-            data_view_so = generate_logs.create_data_view_so_7_11()
-            discover_sos = generate_logs.generate_discover_sessions_7_11()
-            generate_logs.write_and_import_so(data_view_so, discover_sos)
+            index_name = DATA_GENERATORS[data_type]['index_pattern']
+            create_kibana_objects_for_data_type(data_type, index_name, config)
             update_operation_status(operation_id, 'running', 'Kibana objects created successfully', 95)
         
         update_operation_status(operation_id, 'completed', 'All operations completed successfully!', 100)
         
     except Exception as e:
         update_operation_status(operation_id, 'error', f'Error: {str(e)}', None)
+
+def write_csv_file(entries, data_type):
+    """Write entries to CSV file"""
+    os.makedirs("output_csv", exist_ok=True)
+    
+    # Get existing CSV files to determine next number
+    existing_files = [f for f in os.listdir("output_csv") if f.startswith(f"{data_type}-") and f.endswith(".csv")]
+    next_num = len(existing_files) + 1
+    
+    csv_filename = f"{data_type}-{next_num:03d}.csv"
+    csv_path = os.path.join("output_csv", csv_filename)
+    
+    if entries:
+        # Get all possible fieldnames from all entries
+        fieldnames = set()
+        for entry in entries:
+            fieldnames.update(flatten_dict(entry).keys())
+        
+        fieldnames = sorted(list(fieldnames))
+        
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for entry in entries:
+                flattened = flatten_dict(entry)
+                writer.writerow(flattened)
+    
+    return csv_path
+
+def flatten_dict(d, parent_key='', sep='.'):
+    """Flatten nested dictionaries for CSV output"""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        elif isinstance(v, list):
+            # Convert lists to JSON strings for CSV
+            items.append((new_key, json.dumps(v)))
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+def ingest_data_to_es(entries, index_name, data_type, config):
+    """Ingest data entries into Elasticsearch"""
+    import requests
+    
+    es_host = config['elasticsearch']['host']
+    es_user = config['elasticsearch']['username']
+    es_pass = config['elasticsearch']['password']
+    
+    index_url = f"{es_host}/{index_name}"
+    
+    # Create index with appropriate mapping
+    mapping = get_mapping_for_data_type(data_type)
+    resp = requests.put(
+        index_url,
+        auth=(es_user, es_pass),
+        headers={"Content-Type": "application/json"},
+        json={
+            "settings": {
+                "number_of_shards": 1,
+                "number_of_replicas": 0
+            },
+            "mappings": mapping
+        }
+    )
+    
+    if resp.status_code not in (200, 400):
+        raise Exception(f"Index creation error: {resp.text}")
+    
+    # Bulk ingest data
+    bulk_data = []
+    for entry in entries:
+        bulk_data.append(json.dumps({"index": {}}))
+        bulk_data.append(json.dumps(entry))
+    
+    bulk_body = "\n".join(bulk_data) + "\n"
+    
+    resp2 = requests.post(
+        f"{index_url}/_bulk",
+        auth=(es_user, es_pass),
+        headers={"Content-Type": "application/x-ndjson"},
+        data=bulk_body
+    )
+    
+    if resp2.status_code != 200:
+        raise Exception(f"Bulk ingest error: {resp2.text}")
+
+def get_mapping_for_data_type(data_type):
+    """Get appropriate Elasticsearch mapping for data type"""
+    mappings = {
+        "unstructured_logs": {
+            "properties": {
+                "@timestamp": {"type": "date"},
+                "log.level": {"type": "keyword"},
+                "source": {"type": "keyword"},
+                "message": {"type": "text"}
+            }
+        },
+        "structured_logs": {
+            "properties": {
+                "@timestamp": {"type": "date"},
+                "service.name": {"type": "keyword"},
+                "service.version": {"type": "keyword"},
+                "log.level": {"type": "keyword"},
+                "environment": {"type": "keyword"},
+                "host.name": {"type": "keyword"},
+                "trace.id": {"type": "keyword"},
+                "span.id": {"type": "keyword"},
+                "user.id": {"type": "keyword"},
+                "http.method": {"type": "keyword"},
+                "http.status_code": {"type": "integer"},
+                "http.response_time_ms": {"type": "integer"},
+                "message": {"type": "text"}
+            }
+        },
+        "distributed_traces": {
+            "properties": {
+                "@timestamp": {"type": "date"},
+                "trace.id": {"type": "keyword"},
+                "span.id": {"type": "keyword"},
+                "span.parent_id": {"type": "keyword"},
+                "span.name": {"type": "keyword"},
+                "service.name": {"type": "keyword"},
+                "operation.name": {"type": "keyword"},
+                "span.kind": {"type": "keyword"},
+                "span.status": {"type": "keyword"},
+                "duration.ms": {"type": "integer"},
+                "span.start_time": {"type": "date"},
+                "span.end_time": {"type": "date"}
+            }
+        },
+        "metrics": {
+            "properties": {
+                "@timestamp": {"type": "date"},
+                "metric.type": {"type": "keyword"},
+                "metric.name": {"type": "keyword"},
+                "metric.value": {"type": "double"},
+                "service.name": {"type": "keyword"},
+                "host.name": {"type": "keyword"},
+                "environment": {"type": "keyword"}
+            }
+        },
+        "security_events": {
+            "properties": {
+                "@timestamp": {"type": "date"},
+                "event.type": {"type": "keyword"},
+                "event.id": {"type": "keyword"},
+                "event.severity": {"type": "keyword"},
+                "event.action": {"type": "keyword"},
+                "event.outcome": {"type": "keyword"},
+                "source.ip": {"type": "ip"},
+                "destination.ip": {"type": "ip"},
+                "user.name": {"type": "keyword"},
+                "host.name": {"type": "keyword"}
+            }
+        },
+        "alerts": {
+            "properties": {
+                "@timestamp": {"type": "date"},
+                "alert.name": {"type": "keyword"},
+                "alert.state": {"type": "keyword"},
+                "alert.severity": {"type": "keyword"},
+                "alert.id": {"type": "keyword"},
+                "alert.started_at": {"type": "date"},
+                "alert.resolved_at": {"type": "date"},
+                "metric.value": {"type": "double"},
+                "metric.threshold": {"type": "double"}
+            }
+        },
+        "network_traffic": {
+            "properties": {
+                "@timestamp": {"type": "date"},
+                "flow.id": {"type": "keyword"},
+                "network.protocol": {"type": "keyword"},
+                "source.ip": {"type": "ip"},
+                "destination.ip": {"type": "ip"},
+                "source.port": {"type": "integer"},
+                "destination.port": {"type": "integer"},
+                "network.bytes": {"type": "long"},
+                "network.packets": {"type": "integer"},
+                "network.direction": {"type": "keyword"},
+                "event.action": {"type": "keyword"}
+            }
+        },
+        "apm_data": {
+            "properties": {
+                "@timestamp": {"type": "date"},
+                "transaction.id": {"type": "keyword"},
+                "transaction.type": {"type": "keyword"},
+                "transaction.name": {"type": "keyword"},
+                "service.name": {"type": "keyword"},
+                "service.version": {"type": "keyword"},
+                "transaction.duration.ms": {"type": "integer"},
+                "transaction.result": {"type": "keyword"},
+                "user.id": {"type": "keyword"},
+                "trace.id": {"type": "keyword"},
+                "span.id": {"type": "keyword"},
+                "http.method": {"type": "keyword"},
+                "http.status_code": {"type": "integer"},
+                "error.type": {"type": "keyword"},
+                "error.message": {"type": "text"}
+            }
+        }
+    }
+    
+    return mappings.get(data_type, {"properties": {"@timestamp": {"type": "date"}}})
+
+def create_kibana_objects_for_data_type(data_type, index_name, config):
+    """Create Kibana saved objects for the specified data type"""
+    # For now, we'll create basic objects - you can extend this later
+    # This is a simplified version - real implementation would create data-type-specific objects
+    data_view_so = create_data_view_so_7_11()
+    data_view_so['attributes']['title'] = index_name
+    data_view_so['id'] = index_name
+    
+    # Create basic discover session
+    discover_sos = [{
+        "id": f"{data_type}_basic_view",
+        "type": "search", 
+        "attributes": {
+            "title": f"{DATA_GENERATORS[data_type]['name']} - Basic View",
+            "description": f"Basic view of {DATA_GENERATORS[data_type]['name']} data"
+        }
+    }]
+    
+    write_and_import_so(data_view_so, discover_sos)
 
 if __name__ == '__main__':
     # Create templates and static directories

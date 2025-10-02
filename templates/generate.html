@@ -50,16 +50,31 @@
                     </div>
                     <div class="card-body">
                         <form method="POST">
+                            <!-- Data Type Selection -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-warning text-dark">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-database me-2"></i>Data Type Selection
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row" id="data-type-grid">
+                                        <!-- Data types will be populated by JavaScript -->
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Generation Parameters -->
                             <div class="row">
                                 <div class="col-md-6 mb-3">
-                                    <label for="num_entries" class="form-label">Number of Log Entries</label>
+                                    <label for="num_entries" class="form-label">Number of Entries</label>
                                     <input type="number" class="form-control" id="num_entries" name="num_entries" 
                                            value="{{ config.log_generation.default_entries }}" 
                                            min="1" max="{{ config.log_generation.max_entries }}" required>
                                     <div class="form-text">Maximum: {{ config.log_generation.max_entries }} entries</div>
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">Generation Options</label>
+                                    <label class="form-label">Output Options</label>
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" id="generate_csv" name="generate_csv" checked>
                                         <label class="form-check-label" for="generate_csv">
@@ -114,34 +129,13 @@
                 <div class="card">
                     <div class="card-header">
                         <h5 class="card-title mb-0">
-                            <i class="fas fa-info-circle me-2"></i>Log Data Overview
+                            <i class="fas fa-info-circle me-2"></i>Available Data Types
                         </h5>
                     </div>
                     <div class="card-body">
-                        <h6>Log Sources:</h6>
-                        <ul class="small">
-                            <li><span class="badge bg-secondary">AuthService</span> - Authentication events</li>
-                            <li><span class="badge bg-secondary">PaymentService</span> - Payment processing</li>
-                            <li><span class="badge bg-secondary">DatabaseService</span> - Database operations</li>
-                            <li><span class="badge bg-secondary">NotificationService</span> - Notifications</li>
-                            <li><span class="badge bg-secondary">CacheService</span> - Cache operations</li>
-                        </ul>
-                        
-                        <h6 class="mt-3">Log Levels:</h6>
-                        <ul class="small">
-                            <li><span class="badge bg-primary">INFO</span> (70%) - General information</li>
-                            <li><span class="badge bg-warning">WARN</span> (10%) - Warning messages</li>
-                            <li><span class="badge bg-danger">ERROR</span> (10%) - Error messages</li>
-                            <li><span class="badge bg-secondary">DEBUG</span> (10%) - Debug information</li>
-                        </ul>
-                        
-                        <h6 class="mt-3">Data Features:</h6>
-                        <ul class="small">
-                            <li>Realistic timestamps (last 365 days)</li>
-                            <li>Error spikes monthly</li>
-                            <li>Dynamic message templates</li>
-                            <li>Fake user data and IP addresses</li>
-                        </ul>
+                        <div id="selected-data-type-info">
+                            <p class="text-muted">Select a data type to see details here.</p>
+                        </div>
                     </div>
                 </div>
                 
@@ -182,6 +176,165 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Data types configuration
+        const dataTypes = {
+            'unstructured_logs': {
+                name: 'Unstructured Logs',
+                description: 'Traditional log files with free-form text messages',
+                icon: 'fas fa-file-alt',
+                details: {
+                    'Sources': ['AuthService', 'PaymentService', 'DatabaseService', 'NotificationService', 'CacheService'],
+                    'Levels': ['INFO (70%)', 'WARN (10%)', 'ERROR (10%)', 'DEBUG (10%)'],
+                    'Features': ['Realistic timestamps', 'Error spikes', 'Dynamic templates', 'Fake user data']
+                }
+            },
+            'structured_logs': {
+                name: 'Structured Logs',
+                description: 'JSON-formatted logs with consistent fields and metadata',
+                icon: 'fas fa-code',
+                details: {
+                    'Services': ['user-api', 'order-service', 'inventory-service', 'notification-service'],
+                    'Fields': ['trace.id', 'span.id', 'user.id', 'http.status_code', 'response_time_ms'],
+                    'Environments': ['production', 'staging', 'development']
+                }
+            },
+            'distributed_traces': {
+                name: 'Distributed Traces',
+                description: 'OpenTelemetry-style tracing data showing request flows across services',
+                icon: 'fas fa-project-diagram',
+                details: {
+                    'Services': ['frontend', 'user-service', 'order-service', 'payment-service'],
+                    'Operations': ['authenticate', 'create_order', 'process_payment', 'send_notification'],
+                    'Formats': ['OpenTelemetry compatible', 'Parent-child relationships', 'Span attributes']
+                }
+            },
+            'metrics': {
+                name: 'Metrics & Time Series',
+                description: 'Counter, gauge, histogram and summary metrics from applications and infrastructure',
+                icon: 'fas fa-chart-line',
+                details: {
+                    'Types': ['Counter', 'Gauge', 'Histogram', 'Summary'],
+                    'Sources': ['Frontend', 'API Gateway', 'Database', 'User Service'],
+                    'Examples': ['response_time', 'cpu_usage_percent', 'requests_total', 'memory_usage_bytes']
+                }
+            },
+            'security_events': {
+                name: 'Security Events',
+                description: 'SIEM-style security events including authentication, network, and threat data',
+                icon: 'fas fa-shield-alt',
+                details: {
+                    'Event Types': ['Authentication', 'Network', 'Malware', 'Data Access'],
+                    'Severities': ['Low', 'Medium', 'High', 'Critical'],
+                    'Attack Types': ['Brute Force', 'SQL Injection', 'XSS', 'Malware', 'DDoS']
+                }
+            },
+            'alerts': {
+                name: 'Alerts & Notifications',
+                description: 'Alert manager style alerts with firing and resolved states',
+                icon: 'fas fa-bell',
+                details: {
+                    'Alert Types': ['HighCPUUsage', 'ServiceDown', 'HighErrorRate', 'SecurityBreach'],
+                    'States': ['Firing', 'Resolved'],
+                    'Severities': ['Warning', 'Critical']
+                }
+            },
+            'network_traffic': {
+                name: 'Network Traffic',
+                description: 'Network flow logs with connection details, protocols, and traffic analysis',
+                icon: 'fas fa-network-wired',
+                details: {
+                    'Protocols': ['TCP', 'UDP', 'ICMP'],
+                    'Directions': ['Inbound', 'Outbound', 'Internal'],
+                    'Data': ['Bytes transferred', 'Packet counts', 'Duration', 'Geo location']
+                }
+            },
+            'apm_data': {
+                name: 'APM Data',
+                description: 'Application Performance Monitoring data with transactions, errors, and traces',
+                icon: 'fas fa-tachometer-alt',
+                details: {
+                    'Transaction Types': ['Request', 'Database Query', 'Background Job'],
+                    'Services': ['Web App', 'API Service', 'Worker', 'Database'],
+                    'Metrics': ['Duration', 'Error rates', 'Throughput', 'Resource usage']
+                }
+            }
+        };
+
+        let selectedDataType = 'unstructured_logs';
+
+        function initializeDataTypeGrid() {
+            const grid = document.getElementById('data-type-grid');
+            grid.innerHTML = '';
+
+            for (const [key, dataType] of Object.entries(dataTypes)) {
+                const col = document.createElement('div');
+                col.className = 'col-md-6 col-lg-4 mb-3';
+                
+                col.innerHTML = `
+                    <div class="data-type-card ${key === selectedDataType ? 'selected' : ''}" data-type="${key}">
+                        <div class="card h-100 cursor-pointer">
+                            <div class="card-body text-center">
+                                <i class="${dataType.icon} fa-2x mb-2 text-primary"></i>
+                                <h6 class="card-title">${dataType.name}</h6>
+                                <p class="card-text small text-muted">${dataType.description}</p>
+                            </div>
+                        </div>
+                        <input type="radio" name="data_type" value="${key}" ${key === selectedDataType ? 'checked' : ''} style="display: none;">
+                    </div>
+                `;
+                
+                grid.appendChild(col);
+            }
+
+            // Add click handlers
+            document.querySelectorAll('.data-type-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    selectDataType(this.dataset.type);
+                });
+            });
+
+            updateDataTypeInfo();
+        }
+
+        function selectDataType(type) {
+            selectedDataType = type;
+            
+            // Update UI
+            document.querySelectorAll('.data-type-card').forEach(card => {
+                card.classList.remove('selected');
+                card.querySelector('input[type="radio"]').checked = false;
+            });
+            
+            document.querySelector(`[data-type="${type}"]`).classList.add('selected');
+            document.querySelector(`[data-type="${type}"] input[type="radio"]`).checked = true;
+            
+            updateDataTypeInfo();
+        }
+
+        function updateDataTypeInfo() {
+            const dataType = dataTypes[selectedDataType];
+            const infoDiv = document.getElementById('selected-data-type-info');
+            
+            let html = `
+                <div class="text-center mb-3">
+                    <i class="${dataType.icon} fa-2x text-primary mb-2"></i>
+                    <h6>${dataType.name}</h6>
+                    <p class="small text-muted">${dataType.description}</p>
+                </div>
+            `;
+            
+            for (const [category, items] of Object.entries(dataType.details)) {
+                html += `<h6 class="small fw-bold">${category}:</h6>`;
+                html += '<ul class="small">';
+                items.forEach(item => {
+                    html += `<li>${item}</li>`;
+                });
+                html += '</ul>';
+            }
+            
+            infoDiv.innerHTML = html;
+        }
+
         // Enable/disable Kibana objects checkbox based on ES ingestion
         document.getElementById('ingest_to_es').addEventListener('change', function() {
             const kibanaCheckbox = document.getElementById('create_kibana_objects');
@@ -193,8 +346,38 @@
             }
         });
         
-        // Initialize the state
-        document.getElementById('create_kibana_objects').disabled = !document.getElementById('ingest_to_es').checked;
+        // Initialize everything when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDataTypeGrid();
+            
+            // Initialize the Kibana checkbox state
+            document.getElementById('create_kibana_objects').disabled = !document.getElementById('ingest_to_es').checked;
+        });
     </script>
+    
+    <style>
+        .data-type-card {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .data-type-card:hover .card {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .data-type-card.selected .card {
+            border: 2px solid #0d6efd;
+            background-color: #f8f9ff;
+        }
+        
+        .data-type-card.selected .card-body i {
+            color: #0d6efd !important;
+        }
+        
+        .cursor-pointer {
+            cursor: pointer;
+        }
+    </style>
 </body>
 </html>

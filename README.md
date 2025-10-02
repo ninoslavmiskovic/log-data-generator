@@ -1,9 +1,28 @@
-# Unstructured Log Data Generator
+# Multi-Format Data Generator
 
-A powerful tool for generating synthetic log data with both **command-line** and **modern web interface** options. Generate realistic, unstructured logs and automatically ingest them into Elasticsearch with pre-built Kibana dashboards and saved searches.
+A powerful tool for generating **8 different types of synthetic observability and security data** with both **command-line** and **modern web interface** options. Generate realistic data for testing, development, and demonstration purposes across the entire observability stack.
 
 ![Dashboard Overview](screenshots/dashboard-overview.png)
-*Modern web interface dashboard - your control center for log generation*
+*Modern web interface dashboard - your control center for data generation*
+
+## 🆕 8 Data Types Supported
+
+This project now supports **8 comprehensive data types** covering the entire observability and security spectrum:
+
+### 📊 **Observability Data**
+- **🗂️ Unstructured Logs** - Traditional log files with free-form text messages
+- **💻 Structured Logs** - JSON-formatted logs with consistent fields and metadata  
+- **🔗 Distributed Traces** - OpenTelemetry-style tracing data showing request flows
+- **📈 Metrics & Time Series** - Counter, gauge, histogram and summary metrics
+- **⚡ APM Data** - Application Performance Monitoring with transactions and errors
+
+### 🔒 **Security & Infrastructure Data**
+- **🛡️ Security Events** - SIEM-style security events with threat intelligence
+- **🚨 Alerts & Notifications** - Alert manager style alerts with firing/resolved states  
+- **🌐 Network Traffic** - Network flow logs with connection details and protocols
+
+![Data Type Selection](screenshots/data-type-selection.png)
+*Choose from 8 different data types with interactive selection interface*
 
 ## 🆕 New Web Interface
 
@@ -268,14 +287,38 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## 🎯 Use Cases
 
-- **Security Testing** - Generate realistic security logs for SIEM testing
-- **Performance Testing** - Stress test your Elasticsearch clusters
-- **Training & Education** - Learn ES|QL, Kibana, and log analysis
-- **Development** - Mock data for application development
-- **Demonstrations** - Showcase Elastic Stack capabilities
-- **Proof of Concepts** - Validate log processing pipelines
+### 🔍 **Observability & Monitoring**
+- **Performance Testing** - Generate realistic metrics and APM data for load testing dashboards
+- **Distributed Tracing** - Test trace correlation and service dependency mapping
+- **Log Analysis** - Practice log parsing, correlation, and alerting with structured/unstructured logs
+- **Metrics Monitoring** - Validate monitoring systems with time-series data
+
+### 🛡️ **Security & Compliance**
+- **SIEM Testing** - Generate security events for testing detection rules and workflows
+- **Incident Response** - Practice security incident investigation with realistic attack data
+- **Compliance Auditing** - Test audit log collection and compliance reporting
+- **Threat Hunting** - Create datasets for threat detection and analysis training
+
+### 🧪 **Development & Testing**
+- **Application Development** - Mock data for APM and logging integrations
+- **Infrastructure Testing** - Stress test your Elasticsearch clusters with realistic data
+- **Training & Education** - Learn ES|QL, Kibana, and observability best practices
+- **Proof of Concepts** - Validate observability and security tooling with diverse datasets
+
+### 🎪 **Demonstrations & Showcases**
+- **Elastic Stack Demos** - Showcase full observability capabilities across all data types
+- **Security Tool Demos** - Demonstrate SIEM capabilities with realistic security events
+- **Architecture Presentations** - Illustrate distributed systems with realistic trace data
+- **Vendor Evaluations** - Test observability platforms with comprehensive data types
 
 ## 🌟 What's New
+
+### v3.0 - Multi-Format Data Generator 🚀
+- 🎯 **8 Data Types** - Complete observability and security data spectrum
+- 📊 **Advanced Data Types** - Traces, metrics, security events, APM data, network traffic
+- 🎨 **Interactive Selection** - Visual data type picker with detailed descriptions
+- 🗂️ **Smart Indexing** - Automatic Elasticsearch mappings for each data type
+- 📈 **Comprehensive Schemas** - Industry-standard formats (OpenTelemetry, ECS, etc.)
 
 ### v2.0 - Web Interface Release
 - ✨ Complete web-based interface

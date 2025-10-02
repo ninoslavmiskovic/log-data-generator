@@ -1,221 +1,299 @@
 # Unstructured Log Data Generator
 
-This Python script generates a synthetic dataset of unstructured logs in CSV format, simulating logs from various services over a one-year period. The logs include different severity levels, sources, and detailed messages with dynamic content—suitable for testing, analysis, or demonstration purposes.
+A powerful tool for generating synthetic log data with both **command-line** and **modern web interface** options. Generate realistic, unstructured logs and automatically ingest them into Elasticsearch with pre-built Kibana dashboards and saved searches.
 
-In this updated version, the script not only generates and saves logs but also:
-- **Automatically ingests the logs into Elasticsearch** under the index `unstructured-logs`.
-- **Creates a Kibana data view (index-pattern) named `unstructured-logs`** via the Saved Objects API.
-- **Generates Discover Session saved objects** with ES|QL queries that reference the newly created data view.
-- **Automatically imports** the saved objects into Kibana using the Saved Objects API (via multipart/form-data).
+![Dashboard Overview](screenshots/dashboard-overview.png)
+*Modern web interface dashboard - your control center for log generation*
 
-This end-to-end automation lets you run the script once and have your log data, data view, and discover sessions all set up in your local environment—no manual uploads required.
+## 🆕 New Web Interface
 
----
+This project now includes a **modern, responsive web UI** that makes log generation accessible to everyone - no command line experience required!
 
-## Ensuring Unique Datasets on Each Execution
+### ✨ Key Features
 
-Because the script relies on randomization without a fixed seed, each time you run it:
-- **New Log Entries:** A fresh set of log entries with different timestamps, sources, levels, and messages is generated.
-- **Varied Data:** Usernames, IP addresses, transaction details, and other data points are unique.
-- **Different Patterns:** While the overall structure and patterns (like error spikes) remain consistent, the specific details and timing will vary.
+- 🎨 **Modern Web Interface** - Clean, responsive design built with Bootstrap 5
+- ⚙️ **Easy Configuration** - Web-based setup for Elasticsearch and Kibana connections  
+- 📊 **Real-time Progress Tracking** - Live updates during log generation and ingestion
+- 🧪 **Connection Testing** - Verify your Elasticsearch and Kibana settings
+- 📈 **Multiple Output Options** - CSV files, Elasticsearch ingestion, and Kibana objects
+- 🎯 **Pre-built Dashboards** - Automatic creation of data views and discover sessions
+- 🔒 **Secure Configuration** - Encrypted storage of connection credentials
 
-This is beneficial for:
-- **Testing:** Your log analysis tools or applications can be tested with varied data.
-- **Simulation:** Real-world scenarios, where log data is never the same, can be mimicked.
-- **Learning:** It provides diverse datasets for practice in data analysis, machine learning, or cybersecurity.
+## 🚀 Quick Start (Web Interface)
 
----
-
-## Features
-
-- **Simulates realistic log data** from multiple services:
-  - `AuthService`
-  - `PaymentService`
-  - `DatabaseService`
-  - `NotificationService`
-  - `CacheService`
-- **Generates over 10,000 log entries** with timestamps spanning the past year.
-- **Includes various log levels:**
-  - `INFO`
-  - `WARN`
-  - `ERROR`
-  - `DEBUG`
-- **Introduces spikes and patterns** to mimic real-world scenarios:
-  - Monthly error spikes.
-  - Security incidents and performance issues.
-- **Dynamic message content** powered by the [Faker](https://faker.readthedocs.io/en/master/) library.
-- **Automatic ingestion into Elasticsearch:**
-  - Logs are bulk-indexed into the `unstructured-logs` index.
-- **Automatic creation of a Kibana data view:**
-  - A data view (index-pattern) with the ID `unstructured-logs` is created so that Discover, Visualize, and Dashboard apps can use it.
-- **Generates Discover Sessions with ES|QL queries:**
-  - Saved objects for Discover sessions are generated referencing the data view.
-- **Automatic import of Saved Objects:**
-  - The NDJSON file containing the data view and Discover sessions is automatically imported into Kibana via the Saved Objects API.
-
----
-
-## Requirements
-
-- **Python** 3.6 or higher
-- **Faker** and **requests** libraries
-
----
-
-## Installation
-
-### 1. Clone the Repository
-
-```
+### 1. Installation
+```bash
 git clone https://github.com/ninoslavmiskovic/log-data-generator.git
 cd log-data-generator
-```
-
-### 2. Set Up a Virtual Environment (Recommended)**
-
-It's best practice to use a virtual environment to manage dependencies.
-
-#### 2.1 Create a virtual environment
-
-```
 python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-#### 2.2 Activate the virtual environment
-
-```
-source venv/bin/activate
-```
-
-### 3. Install Dependencies**
-
-Install the required Python packages using `pip`.
-
-```
-pip install Faker requests
-```
-
-### 4. Usage**
-
-Run the script to perform the full end-to-end process:
-
-```
-python3 generate_logs.py
-```
-
-This will:
-
-1. **Generate logs** and write them to a CSV file in output_csv/ (e.g., unstructured-logs-001.csv).
-2. **Bulk ingest the logs** into Elasticsearch under the index unstructured-logs.
-3. **Automatically create a data view** (index-pattern) with ID unstructured-logs, using @timestamp as the time field.
-4. **Generate Discover Session saved objects** with ES|QL queries
-5. **Write the saved objects** to output_saved_objects/kibana_saved_objects.ndjson and **automatically import them into Kibana** using the Saved Objects API.
-
-The script will create a file named logs_dataset.csv in the current directory.
-
-- The dataset will contain log entries with the following fields:
-  - @timestamp
-  -\tlog.level
-  -\tsource
-  -\tmessage 
-
-### Importing the Saved Objects Manually (Optional)
-If needed, you can manually import the NDJSON file:
-
-1. Open Kibana and go to Management > Saved Objects.
-2. Import the NDJSON file (e.g., kibana_saved_searches.ndjson).
+### 2. Launch Web Interface
 ```bash
-curl -X POST "http://localhost:5601/api/saved_objects/_import?overwrite=true" \
-     -H "kbn-xsrf: true" \
-     --form file=@output_saved_objects/kibana_saved_objects.ndjson
-```
-3. Open Discover, select one of the imported sessions, and run the ES|QL queries to analyze your unstructured logs.
-
-### 5. Customization**
-
-#### 5.1. Adjust the Number of Log Entries
-
-## Customization
-
-### Adjust the Number of Log Entries
-
-Change the `num_entries` variable in the script to generate more or fewer log entries.
-
-```
-num_entries = 10000  # Set to desired number of entries
+python app.py
 ```
 
-#### 5.2. Modify Log Levels Distribution
+### 3. Access the Application
+Open your browser and navigate to: **http://localhost:8080**
 
-Alter the weights in the `random.choices` function to change the frequency of each log level.
+![Configuration Screen](screenshots/configuration-screen.png)
+*Easy-to-use configuration interface for Elasticsearch and Kibana*
 
-```
-level = random.choices(
-    log_levels,
-    weights=[0.7, 0.1, 0.1, 0.1]  # Adjust weights for INFO, WARN, ERROR, DEBUG
-)[0]
-```
+## 📋 User Workflows
 
-#### 5.3. Update Message Templates
+### Workflow 1: First-Time Setup
 
-Edit the `messages` dictionary in the script to add or modify message templates for different services and log levels.
+1. **Launch the application** and navigate to http://localhost:8080
+2. **Go to Settings** → Configure your Elasticsearch and Kibana connections
+3. **Test connections** to verify everything is working
+4. **Save configuration** for future use
 
-```
-messages = {
-    'AuthService': {
-        'INFO': [
-            "User '{user}' logged in successfully from IP address {ip_address}",
-            # Add more templates as needed
-        ],
-        # ... other levels and services
-    },
-    # ... other services
+![Settings Flow](screenshots/settings-flow.png)
+*Step-by-step configuration process*
+
+### Workflow 2: Generate Logs (CSV Only)
+
+Perfect for users who just want sample data files:
+
+1. **Navigate to Generate** → Set number of entries (1-1,000,000)
+2. **Enable "Generate CSV file"** (checked by default)
+3. **Click "Start Generation"** → Watch real-time progress
+4. **Download your CSV** from the `output_csv/` directory
+
+![Generation Process](screenshots/generation-process.png)
+*Real-time progress tracking with detailed status updates*
+
+### Workflow 3: Full Elasticsearch + Kibana Integration
+
+For users who want the complete experience:
+
+1. **Configure connections** (Settings page)
+2. **Navigate to Generate** → Set your parameters
+3. **Enable all options:**
+   - ✅ Generate CSV file
+   - ✅ Ingest logs into Elasticsearch  
+   - ✅ Create Kibana saved objects
+4. **Monitor progress** → Automatic redirect to progress tracking
+5. **Access Kibana** → Your data view and discover sessions are ready!
+
+![Kibana Integration](screenshots/kibana-integration.png)
+*Pre-built Kibana discover sessions with DISSECT and GROK parsing examples*
+
+### Workflow 4: Bulk Data Generation
+
+For power users generating large datasets:
+
+1. **Adjust max entries** in Settings (up to 10M entries)
+2. **Use CSV-only mode** for faster generation
+3. **Monitor system resources** during generation
+4. **Batch import** to Elasticsearch using separate tools if needed
+
+## 🎯 Generated Content
+
+### Log Structure
+```json
+{
+  "@timestamp": "2024-03-15T14:30:25.123Z",
+  "log.level": "INFO",
+  "source": "AuthService", 
+  "message": "User 'john_doe' logged in successfully from IP address 192.168.1.100"
 }
 ```
 
-### 6. Example Output**
+### Log Sources & Levels
+- **Sources:** AuthService, PaymentService, DatabaseService, NotificationService, CacheService
+- **Levels:** INFO (70%), WARN (10%), ERROR (10%), DEBUG (10%)
+- **Time Range:** Last 365 days with realistic error spikes
 
-An excerpt from the generated `logs_dataset.csv` file:
+### Kibana Objects Created
+When you enable Kibana integration, you get:
 
-```csv
-Timestamp,Level,Source,Message
-2022-10-02T03:12:45Z,INFO,AuthService,User 'jane_doe' logged in successfully from IP address 192.168.1.100
-2022-11-05T10:45:37Z,ERROR,DatabaseService,Database connection failed: unable to reach primary database cluster 'db-cluster-1'
-2023-08-05T04:00:25Z,ERROR,AuthService,Critical security vulnerability detected: unauthorized access attempt to admin panel from IP '10.0.0.5'
-...
-```
+**Data View:**
+- Index pattern: `unstructured-logs`
+- Time field: `@timestamp`
 
-There is a file in the repo: ***"example_output_logs_dataset.csv"*** you can download and see an example of the output csv.
+**6 Pre-built Discover Sessions:**
+1. **Retrieve All Logs** - Complete log overview
+2. **Count Logs by Level** - Level distribution analysis  
+3. **Count Logs by Source** - Source service breakdown
+4. **Retrieve Error Logs** - Error-only filtering
+5. **Parse AuthService (DISSECT)** - Extract user/IP with DISSECT
+6. **Parse AuthService (GROK)** - Extract user/IP with GROK
 
-### 7. Generating Multiple Datasets
+![Discover Sessions](screenshots/discover-sessions.png)
+*Ready-to-use ES|QL queries demonstrating parsing techniques*
 
-Each time you run the script, it will generate a new CSV file with an incremented sequence number and place it in the `output_csv` directory.
+## 🛠️ Command Line Usage (Advanced)
 
-- Output Files:
-
-  - Files are named in the format `unstructured-logs-001.csv`, `unstructured-logs-002.csv`, etc.
-  - Located in the `output_csv` directory.
-
-**INFO:** Make sure to name your index: ```unstructured-logs``` to make the ES|QL queries work properly. 
-
-### 8. Troubleshooting
-
-#### **8.1. ModuleNotFoundError: No module named 'faker'**
-
-- Ensure that you have activated your virtual environment (if using one).
-- Install the Faker library:
+For automation and scripting, the original command-line interface is still available:
 
 ```bash
-pip install Faker
+# Activate virtual environment
+source venv/bin/activate
+
+# Run with default settings (1000 entries)
+python generate_logs.py
+
+# Customize in the script
+num_entries = 50000  # Edit this value in generate_logs.py
 ```
-- If Python 3 is not installed, install it via Homebrew or from the official website: https://www.python.org/downloads/
 
+### Command Line Features
+- **Bulk generation** of up to billions of entries
+- **Automatic Elasticsearch ingestion**
+- **Kibana saved objects creation**
+- **Scriptable and automatable**
 
-### 9. Contributing
+## ⚙️ Configuration Options
 
-Contributions are welcome! Please feel free to submit a pull request or open an issue if you have suggestions or find any bugs.
+### Web Interface Configuration
+All settings are managed through the web interface:
 
-### 10.License
+- **Elasticsearch:** Host, username, password, API keys
+- **Kibana:** Host, username, password  
+- **Generation:** Default entries, maximum limits
+- **Output:** File paths, naming conventions
+
+![Configuration Options](screenshots/configuration-options.png)
+*Comprehensive configuration management*
+
+### Environment Variables (Optional)
+```bash
+export SECRET_KEY="your-secret-key-here"
+export ES_HOST="http://localhost:9200"
+export ES_USERNAME="elastic"
+export ES_PASSWORD="your-password"
+export KIBANA_HOST="http://localhost:5601"
+export KIBANA_USERNAME="elastic"
+export KIBANA_PASSWORD="your-password"
+```
+
+## 📊 Progress Tracking
+
+Real-time monitoring of all operations:
+
+- **Live progress bars** with percentage completion
+- **Detailed status messages** for each step
+- **Timeline view** of all completed actions
+- **Error handling** with detailed error messages
+- **Success confirmation** with next steps
+
+![Progress Tracking](screenshots/progress-tracking.png)
+*Real-time progress tracking with detailed timeline*
+
+## 🔧 Technical Details
+
+### Architecture
+- **Backend:** Flask web application with threaded operations
+- **Frontend:** Bootstrap 5 with vanilla JavaScript
+- **Storage:** JSON configuration files
+- **Session Management:** Flask-Session for operation tracking
+
+### File Structure
+```
+├── app.py                    # Flask web application
+├── generate_logs.py          # Core log generation logic  
+├── requirements.txt          # Python dependencies
+├── config.json              # User configuration (auto-generated)
+├── templates/               # HTML templates
+│   ├── index.html          # Dashboard
+│   ├── config.html         # Configuration page
+│   ├── generate.html       # Generation interface
+│   └── progress.html       # Progress tracking
+├── static/css/style.css    # Custom styling
+├── output_csv/             # Generated CSV files
+└── output_saved_objects/   # Kibana saved objects
+```
+
+### Performance Considerations
+- **Memory efficient** - Streams large datasets
+- **Background processing** - Non-blocking web interface
+- **Progress tracking** - Real-time status updates
+- **Error recovery** - Graceful handling of failures
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+**Port 5000 already in use:**
+```bash
+# The app now runs on port 8080 by default
+# Access at: http://localhost:8080
+```
+
+**Connection errors:**
+- Use the "Test Connections" feature in Settings
+- Verify Elasticsearch/Kibana are running
+- Check credentials and network connectivity
+
+**Large dataset generation:**
+- Monitor system memory during generation
+- Consider CSV-only mode for very large datasets
+- Increase Elasticsearch heap size if needed
+
+**Installation issues:**
+```bash
+# Ensure virtual environment is activated
+source venv/bin/activate
+
+# Upgrade pip if needed
+pip install --upgrade pip
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Getting Help
+- 📖 Check the [WEB_UI_README.md](WEB_UI_README.md) for detailed web interface documentation
+- 🐛 Report issues on GitHub
+- 💡 Feature requests welcome
+
+## 🤝 Contributing
+
+We welcome contributions! Whether you're:
+- 🎨 Improving the UI/UX
+- 🔧 Adding new features  
+- 🐛 Fixing bugs
+- 📚 Improving documentation
+
+Please feel free to submit pull requests or open issues.
+
+## 📄 License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
+---
+
+## 🎯 Use Cases
+
+- **Security Testing** - Generate realistic security logs for SIEM testing
+- **Performance Testing** - Stress test your Elasticsearch clusters
+- **Training & Education** - Learn ES|QL, Kibana, and log analysis
+- **Development** - Mock data for application development
+- **Demonstrations** - Showcase Elastic Stack capabilities
+- **Proof of Concepts** - Validate log processing pipelines
+
+## 🌟 What's New
+
+### v2.0 - Web Interface Release
+- ✨ Complete web-based interface
+- 📊 Real-time progress tracking  
+- ⚙️ Web-based configuration management
+- 🧪 Built-in connection testing
+- 📈 Enhanced user experience
+- 🔒 Secure credential storage
+
+### v1.x - Command Line Tool
+- 🚀 Original Python script
+- 📝 CSV generation
+- 🔄 Elasticsearch ingestion
+- 📊 Kibana saved objects
+- 🎯 ES|QL query examples
+
+---
+
+**Ready to generate some logs?** 🚀
+
+[**Launch Web Interface →**](http://localhost:8080) | [**View Documentation →**](WEB_UI_README.md) | [**Download Release →**](https://github.com/ninoslavmiskovic/log-data-generator/releases)

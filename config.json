@@ -1,0 +1,16 @@
+{
+  "elasticsearch": {
+    "host": "http://localhost:9200",
+    "username": "elastic",
+    "password": "changeme"
+  },
+  "kibana": {
+    "host": "http://localhost:5601",
+    "username": "elastic",
+    "password": "changeme"
+  },
+  "log_generation": {
+    "default_entries": 1000,
+    "max_entries": 1000000
+  }
+}

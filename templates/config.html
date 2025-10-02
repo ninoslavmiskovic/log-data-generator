@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration - Log Data Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-chart-line me-2"></i>Log Data Generator
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('index') }}">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+                <a class="nav-link" href="{{ url_for('generate') }}">
+                    <i class="fas fa-play me-1"></i>Generate
+                </a>
+                <a class="nav-link active" href="{{ url_for('config') }}">
+                    <i class="fas fa-cog me-1"></i>Settings
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title mb-0">
+                            <i class="fas fa-cog me-2"></i>Configuration Settings
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST">
+                            <!-- Elasticsearch Configuration -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-database me-2"></i>Elasticsearch Configuration
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="es_host" class="form-label">Host URL</label>
+                                            <input type="url" class="form-control" id="es_host" name="es_host" 
+                                                   value="{{ config.elasticsearch.host }}" 
+                                                   placeholder="http://localhost:9200" required>
+                                            <div class="form-text">The full URL to your Elasticsearch instance</div>
+                                        </div>
+                                        <div class="col-md-3 mb-3">
+                                            <label for="es_username" class="form-label">Username</label>
+                                            <input type="text" class="form-control" id="es_username" name="es_username" 
+                                                   value="{{ config.elasticsearch.username }}" 
+                                                   placeholder="elastic" required>
+                                        </div>
+                                        <div class="col-md-3 mb-3">
+                                            <label for="es_password" class="form-label">Password</label>
+                                            <input type="password" class="form-control" id="es_password" name="es_password" 
+                                                   value="{{ config.elasticsearch.password }}" 
+                                                   placeholder="changeme" required>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Kibana Configuration -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-chart-bar me-2"></i>Kibana Configuration
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="kibana_host" class="form-label">Host URL</label>
+                                            <input type="url" class="form-control" id="kibana_host" name="kibana_host" 
+                                                   value="{{ config.kibana.host }}" 
+                                                   placeholder="http://localhost:5601" required>
+                                            <div class="form-text">The full URL to your Kibana instance</div>
+                                        </div>
+                                        <div class="col-md-3 mb-3">
+                                            <label for="kibana_username" class="form-label">Username</label>
+                                            <input type="text" class="form-control" id="kibana_username" name="kibana_username" 
+                                                   value="{{ config.kibana.username }}" 
+                                                   placeholder="elastic" required>
+                                        </div>
+                                        <div class="col-md-3 mb-3">
+                                            <label for="kibana_password" class="form-label">Password</label>
+                                            <input type="password" class="form-control" id="kibana_password" name="kibana_password" 
+                                                   value="{{ config.kibana.password }}" 
+                                                   placeholder="changeme" required>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Log Generation Settings -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-file-alt me-2"></i>Log Generation Settings
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="default_entries" class="form-label">Default Number of Entries</label>
+                                            <input type="number" class="form-control" id="default_entries" name="default_entries" 
+                                                   value="{{ config.log_generation.default_entries }}" 
+                                                   min="1" max="1000000" required>
+                                            <div class="form-text">Default number of log entries to generate</div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="max_entries" class="form-label">Maximum Entries</label>
+                                            <input type="number" class="form-control" id="max_entries" name="max_entries" 
+                                                   value="{{ config.log_generation.max_entries }}" 
+                                                   min="1" max="10000000" required>
+                                            <div class="form-text">Maximum allowed entries per generation</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-primary" onclick="testConnections()">
+                                    <i class="fas fa-network-wired me-2"></i>Test Connections
+                                </button>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save me-2"></i>Save Configuration
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Connection Test Results
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="connection-status">
+                            <p class="text-muted">Click "Test Connections" to verify your settings.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-question-circle me-2"></i>Configuration Help
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>Elasticsearch Settings:</h6>
+                        <ul class="small">
+                            <li>Default port is usually 9200</li>
+                            <li>Use HTTPS if your cluster requires it</li>
+                            <li>API keys can be used instead of username/password</li>
+                        </ul>
+                        
+                        <h6>Kibana Settings:</h6>
+                        <ul class="small">
+                            <li>Default port is usually 5601</li>
+                            <li>Must have access to create saved objects</li>
+                            <li>Same credentials as Elasticsearch typically work</li>
+                        </ul>
+                        
+                        <h6>Security Tips:</h6>
+                        <ul class="small">
+                            <li>Change default passwords in production</li>
+                            <li>Use environment variables for credentials</li>
+                            <li>Enable HTTPS for external connections</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function testConnections() {
+            const statusDiv = document.getElementById('connection-status');
+            statusDiv.innerHTML = '<div class="d-flex align-items-center"><div class="spinner-border spinner-border-sm me-2" role="status"></div>Testing connections...</div>';
+            
+            // Get current form values
+            const formData = {
+                es_host: document.getElementById('es_host').value,
+                es_username: document.getElementById('es_username').value,
+                es_password: document.getElementById('es_password').value,
+                kibana_host: document.getElementById('kibana_host').value,
+                kibana_username: document.getElementById('kibana_username').value,
+                kibana_password: document.getElementById('kibana_password').value
+            };
+            
+            fetch('/test-connection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                let html = '';
+                for (const [service, result] of Object.entries(data)) {
+                    const badgeClass = result.status === 'success' ? 'bg-success' : 'bg-danger';
+                    const iconClass = result.status === 'success' ? 'fas fa-check-circle' : 'fas fa-times-circle';
+                    html += `
+                        <div class="mb-2">
+                            <span class="badge ${badgeClass} me-2">
+                                <i class="${iconClass} me-1"></i>${service.charAt(0).toUpperCase() + service.slice(1)}
+                            </span>
+                            <div class="small text-muted">${result.message}</div>
+                        </div>
+                    `;
+                }
+                statusDiv.innerHTML = html;
+            })
+            .catch(error => {
+                statusDiv.innerHTML = '<div class="alert alert-danger small">Error testing connections: ' + error.message + '</div>';
+            });
+        }
+    </script>
+</body>
+</html>

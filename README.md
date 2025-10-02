@@ -2,7 +2,10 @@
 
 A powerful tool for generating synthetic log data with both **command-line** and **modern web interface** options. Generate realistic, unstructured logs and automatically ingest them into Elasticsearch with pre-built Kibana dashboards and saved searches.
 
-![Dashboard Overview](screenshots/dashboard-overview.png)
+<img width="2772" height="1530" alt="CleanShot 2025-10-02 at 21 35 22@2x" src="https://github.com/user-attachments/assets/3d5f048f-a9a9-4950-85ae-810911c58673" />
+
+
+
 *Modern web interface dashboard - your control center for log generation*
 
 ## 🆕 New Web Interface
@@ -38,7 +41,8 @@ python app.py
 ### 3. Access the Application
 Open your browser and navigate to: **http://localhost:8080**
 
-![Configuration Screen](screenshots/configuration-screen.png)
+<img width="2688" height="1692" alt="CleanShot 2025-10-02 at 21 37 25@2x" src="https://github.com/user-attachments/assets/aba8281e-d7e4-4809-b58b-cdd9ac2cea19" />
+
 *Easy-to-use configuration interface for Elasticsearch and Kibana*
 
 ## 📋 User Workflows
@@ -50,7 +54,6 @@ Open your browser and navigate to: **http://localhost:8080**
 3. **Test connections** to verify everything is working
 4. **Save configuration** for future use
 
-![Settings Flow](screenshots/settings-flow.png)
 *Step-by-step configuration process*
 
 ### Workflow 2: Generate Logs (CSV Only)
@@ -62,7 +65,7 @@ Perfect for users who just want sample data files:
 3. **Click "Start Generation"** → Watch real-time progress
 4. **Download your CSV** from the `output_csv/` directory
 
-![Generation Process](screenshots/generation-process.png)
+
 *Real-time progress tracking with detailed status updates*
 
 ### Workflow 3: Full Elasticsearch + Kibana Integration
@@ -78,7 +81,6 @@ For users who want the complete experience:
 4. **Monitor progress** → Automatic redirect to progress tracking
 5. **Access Kibana** → Your data view and discover sessions are ready!
 
-![Kibana Integration](screenshots/kibana-integration.png)
 *Pre-built Kibana discover sessions with DISSECT and GROK parsing examples*
 
 ### Workflow 4: Bulk Data Generation
@@ -156,7 +158,9 @@ All settings are managed through the web interface:
 - **Generation:** Default entries, maximum limits
 - **Output:** File paths, naming conventions
 
-![Configuration Options](screenshots/configuration-options.png)
+<img width="2674" height="1878" alt="CleanShot 2025-10-02 at 21 39 04@2x" src="https://github.com/user-attachments/assets/64b428c6-f0ba-4d77-99aa-b20426e4001f" />
+
+
 *Comprehensive configuration management*
 
 ### Environment Variables (Optional)
@@ -179,8 +183,9 @@ Real-time monitoring of all operations:
 - **Timeline view** of all completed actions
 - **Error handling** with detailed error messages
 - **Success confirmation** with next steps
+- 
+<img width="1884" height="1186" alt="CleanShot 2025-10-02 at 21 39 22@2x" src="https://github.com/user-attachments/assets/89f2374d-5740-4bf8-9e67-0ff0d67782e7" />
 
-![Progress Tracking](screenshots/progress-tracking.png)
 *Real-time progress tracking with detailed timeline*
 
 ## 🔧 Technical Details

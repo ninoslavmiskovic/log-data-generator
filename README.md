@@ -57,6 +57,14 @@ python app.py
 ### 3. Access the Application
 Open your browser and navigate to: **http://localhost:8080**
 
+> **Note:** The app runs on port 8080 by default to avoid conflicts with macOS AirPlay Receiver which uses port 5000.
+
+### 4. First-Time Setup
+1. **Navigate to Settings** (⚙️ Settings in the navigation)
+2. **Configure your connections** (see Configuration section below)
+3. **Test connections** to verify everything works
+4. **Start generating data!**
+
 ![Configuration Screen](screenshots/configuration-screen.png)
 *Easy-to-use configuration interface for Elasticsearch and Kibana*
 
@@ -109,9 +117,11 @@ For power users generating large datasets:
 3. **Monitor system resources** during generation
 4. **Batch import** to Elasticsearch using separate tools if needed
 
-## 🎯 Generated Content
+## 🎯 Generated Content & Examples
 
-### Log Structure
+### Data Formats by Type
+
+#### 🗂️ **Unstructured Logs**
 ```json
 {
   "@timestamp": "2024-03-15T14:30:25.123Z",
@@ -121,25 +131,163 @@ For power users generating large datasets:
 }
 ```
 
-### Log Sources & Levels
-- **Sources:** AuthService, PaymentService, DatabaseService, NotificationService, CacheService
-- **Levels:** INFO (70%), WARN (10%), ERROR (10%), DEBUG (10%)
-- **Time Range:** Last 365 days with realistic error spikes
+#### 💻 **Structured Logs**
+```json
+{
+  "@timestamp": "2024-03-15T14:30:25.123Z",
+  "service.name": "user-api",
+  "service.version": "2.1.3",
+  "log.level": "INFO",
+  "environment": "production",
+  "host.name": "web-server-01",
+  "trace.id": "550e8400-e29b-41d4-a716-446655440000",
+  "span.id": "6ba7b810-9dad-11d1",
+  "user.id": "user-123",
+  "http.method": "POST",
+  "http.status_code": 200,
+  "http.response_time_ms": 145,
+  "message": "User profile updated successfully"
+}
+```
+
+#### 🔗 **Distributed Traces**
+```json
+{
+  "@timestamp": "2024-03-15T14:30:25.123Z",
+  "trace.id": "550e8400-e29b-41d4-a716-446655440000",
+  "span.id": "6ba7b810-9dad-11d1",
+  "span.parent_id": "6ba7b810-9dad-11d0",
+  "span.name": "user-service.authenticate",
+  "service.name": "user-service",
+  "operation.name": "authenticate",
+  "span.kind": "server",
+  "span.status": "OK",
+  "duration.ms": 45,
+  "user.id": "user-123",
+  "user.email": "john@example.com"
+}
+```
+
+#### 📈 **Metrics & Time Series**
+```json
+{
+  "@timestamp": "2024-03-15T14:30:25.123Z",
+  "metric.type": "counter",
+  "metric.name": "requests_total",
+  "metric.value": 1547,
+  "service.name": "api-gateway",
+  "host.name": "gateway-01",
+  "environment": "production",
+  "labels": {
+    "method": "GET",
+    "status": "success"
+  }
+}
+```
+
+#### 🛡️ **Security Events**
+```json
+{
+  "@timestamp": "2024-03-15T14:30:25.123Z",
+  "event.type": "authentication",
+  "event.id": "sec-001-2024-03-15",
+  "event.severity": "high",
+  "event.action": "login_attempt",
+  "event.outcome": "failure",
+  "source.ip": "192.168.1.100",
+  "user.name": "admin",
+  "authentication.method": "password",
+  "threat.indicator": "brute_force",
+  "message": "Failed login attempt for user"
+}
+```
+
+#### 🚨 **Alerts & Notifications**
+```json
+{
+  "@timestamp": "2024-03-15T14:30:25.123Z",
+  "alert.name": "HighCPUUsage",
+  "alert.state": "firing",
+  "alert.severity": "critical",
+  "alert.id": "alert-cpu-001",
+  "metric.value": 95,
+  "metric.threshold": 85,
+  "labels": {
+    "service": "database",
+    "environment": "production",
+    "instance": "db-server-01"
+  },
+  "annotations": {
+    "summary": "CPU usage is above threshold",
+    "description": "CPU usage has exceeded the configured threshold"
+  }
+}
+```
+
+#### 🌐 **Network Traffic**
+```json
+{
+  "@timestamp": "2024-03-15T14:30:25.123Z",
+  "flow.id": "flow-001-2024-03-15",
+  "network.protocol": "tcp",
+  "source.ip": "10.0.1.100",
+  "destination.ip": "10.0.2.200",
+  "source.port": 45123,
+  "destination.port": 443,
+  "network.bytes": 8547,
+  "network.packets": 12,
+  "network.direction": "outbound",
+  "event.action": "allowed"
+}
+```
+
+#### ⚡ **APM Data**
+```json
+{
+  "@timestamp": "2024-03-15T14:30:25.123Z",
+  "transaction.id": "txn-001-2024-03-15",
+  "transaction.type": "request",
+  "transaction.name": "GET /api/users",
+  "service.name": "web-app",
+  "transaction.duration.ms": 234,
+  "transaction.result": "success",
+  "user.id": "user-123",
+  "trace.id": "550e8400-e29b-41d4-a716-446655440000",
+  "http.method": "GET",
+  "http.status_code": 200,
+  "http.url": "https://api.company.com/users"
+}
+```
+
+### Index Patterns Created
+
+When you enable Elasticsearch integration, the following indices are created:
+
+- `logs-unstructured` - Unstructured log data
+- `logs-structured` - Structured log data  
+- `traces` - Distributed tracing data
+- `metrics` - Time series metrics
+- `security-events` - Security and threat data
+- `alerts` - Alert and notification data
+- `network-traffic` - Network flow data
+- `apm` - Application performance data
 
 ### Kibana Objects Created
-When you enable Kibana integration, you get:
 
-**Data View:**
-- Index pattern: `unstructured-logs`
-- Time field: `@timestamp`
+**Data Views:**
+- Automatic index pattern creation with proper field mapping
+- Time field configuration (@timestamp)
+- Field type optimization for search and visualization
 
-**6 Pre-built Discover Sessions:**
-1. **Retrieve All Logs** - Complete log overview
-2. **Count Logs by Level** - Level distribution analysis  
-3. **Count Logs by Source** - Source service breakdown
-4. **Retrieve Error Logs** - Error-only filtering
-5. **Parse AuthService (DISSECT)** - Extract user/IP with DISSECT
-6. **Parse AuthService (GROK)** - Extract user/IP with GROK
+**Discover Sessions (for Unstructured Logs):**
+1. **Retrieve All Logs** - Complete log overview sorted by timestamp
+2. **Count Logs by Level** - Aggregation showing log level distribution
+3. **Count Logs by Source** - Breakdown by service/source
+4. **Retrieve Error Logs** - Error-only filtering for troubleshooting
+5. **Parse AuthService (DISSECT)** - Extract user/IP using DISSECT parsing
+6. **Parse AuthService (GROK)** - Extract user/IP using GROK parsing
+
+> **Note:** Different data types will have their own appropriate saved searches and visualizations.
 
 ![Discover Sessions](screenshots/discover-sessions.png)
 *Ready-to-use ES|QL queries demonstrating parsing techniques*
@@ -232,25 +380,86 @@ Real-time monitoring of all operations:
 - **Progress tracking** - Real-time status updates
 - **Error recovery** - Graceful handling of failures
 
-## 🔍 Troubleshooting
+### Performance Tips & Optimization
+
+**For Large Datasets (100K+ entries):**
+- Start with smaller batches for testing (1K-10K entries)
+- Monitor system memory usage during generation
+- Use CSV-only mode for very large datasets to avoid Elasticsearch timeouts
+- Consider generating multiple smaller batches instead of one large batch
+
+**Elasticsearch Optimization:**
+```bash
+# Increase JVM heap size for large ingestions
+# In elasticsearch.yml or via environment:
+ES_JAVA_OPTS="-Xms2g -Xmx2g"
+
+# Disable replicas during bulk loading (re-enable after)
+PUT /your-index/_settings
+{
+  "number_of_replicas": 0
+}
+
+# Use bulk ingestion settings
+PUT /_cluster/settings
+{
+  "transient": {
+    "indices.memory.index_buffer_size": "40%"
+  }
+}
+```
+
+**System Resource Management:**
+- **Memory:** Each data type uses ~50-100MB per 100K entries during generation
+- **Disk:** CSV files are ~50-200KB per 1K entries depending on data type
+- **CPU:** Generation is CPU-intensive, consider running during off-peak hours
+- **Network:** Elasticsearch ingestion bandwidth depends on entry size and network latency
+
+**Development & Production:**
+```bash
+# Development mode with auto-reload
+export FLASK_ENV=development
+export FLASK_DEBUG=1
+python app.py
+
+# Production deployment with gunicorn
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:8080 app:app
+```
+
+## 🔧 Troubleshooting
 
 ### Common Issues
 
-**Port 5000 already in use:**
+**Port 8080 already in use:**
 ```bash
-# The app now runs on port 8080 by default
-# Access at: http://localhost:8080
+# Change the port in app.py if needed
+# Line 493: app.run(debug=True, host='0.0.0.0', port=8080)
+# Change 8080 to another port like 3000 or 5001
 ```
 
 **Connection errors:**
 - Use the "Test Connections" feature in Settings
 - Verify Elasticsearch/Kibana are running
 - Check credentials and network connectivity
+- Ensure your Elasticsearch cluster accepts connections from your IP
+
+**Kibana saved object import errors (415 Unsupported Media Type):**
+```bash
+# This is a known issue with some Kibana versions
+# The data is still generated and ingested successfully
+# You can manually import saved objects if needed:
+curl -X POST "http://localhost:5601/api/saved_objects/_import?overwrite=true" \
+  -H "kbn-xsrf: true" \
+  -H "Authorization: Basic $(echo -n 'elastic:your-password' | base64)" \
+  --form file=@output_saved_objects/kibana_saved_objects.ndjson
+```
 
 **Large dataset generation:**
 - Monitor system memory during generation
-- Consider CSV-only mode for very large datasets
-- Increase Elasticsearch heap size if needed
+- Consider CSV-only mode for very large datasets (1M+ entries)
+- Increase Elasticsearch heap size if needed for ingestion
+- Use smaller batch sizes for testing first
 
 **Installation issues:**
 ```bash
@@ -262,7 +471,15 @@ pip install --upgrade pip
 
 # Install dependencies
 pip install -r requirements.txt
+
+# If you get SSL warnings, they're harmless and won't affect functionality
 ```
+
+**Data not appearing in Kibana:**
+1. **Check index creation:** Verify the index was created in Elasticsearch
+2. **Refresh index pattern:** Go to Kibana → Management → Index Patterns → Refresh
+3. **Check time range:** Ensure Kibana time picker covers the generated data range (last 365 days)
+4. **Verify data ingestion:** Check Elasticsearch directly: `GET /your-index/_count`
 
 ### Getting Help
 - 📖 Check the [WEB_UI_README.md](WEB_UI_README.md) for detailed web interface documentation

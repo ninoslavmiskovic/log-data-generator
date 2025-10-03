@@ -321,9 +321,6 @@ All settings are managed through the web interface:
 - **Generation:** Default entries, maximum limits
 - **Output:** File paths, naming conventions
 
-![Configuration Options](screenshots/configuration-options.png)
-*Comprehensive configuration management*
-
 ### Environment Variables (Optional)
 ```bash
 export SECRET_KEY="your-secret-key-here"
@@ -345,8 +342,6 @@ Real-time monitoring of all operations:
 - **Error handling** with detailed error messages
 - **Success confirmation** with next steps
 
-![Progress Tracking](screenshots/progress-tracking.png)
-*Real-time progress tracking with detailed timeline*
 
 ## 🔧 Technical Details
 

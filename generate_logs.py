@@ -311,20 +311,70 @@ def write_and_import_so(data_view_obj, discover_objs):
             f.write(json.dumps(obj) + "\n")
     print(f"Saved objects NDJSON written to {ndjson_path}")
     
-    with open(ndjson_path, "rb") as f:
-        files = {
-            "file": ("kibana_saved_objects.ndjson", f)
-        }
-        resp = requests.post(
-            f"{KIBANA_HOST}/api/saved_objects/_import?overwrite=true",
-            auth=(KIBANA_USER, KIBANA_PASS),
-            headers={"kbn-xsrf": "true"},
-            files=files
-        )
-    if resp.status_code == 200:
-        print("Data view and discover sessions imported into Kibana!")
-    else:
-        print(f"Error importing NDJSON: {resp.status_code} -> {resp.text}")
+    # Import into Kibana with correct headers and format
+    try:
+        with open(ndjson_path, "rb") as f:
+            files = {
+                "file": ("kibana_saved_objects.ndjson", f, "application/ndjson")
+            }
+            headers = {
+                "kbn-xsrf": "true",
+                "kbn-version": "8.0.0"  # Add version header for compatibility
+            }
+            
+            resp = requests.post(
+                f"{KIBANA_HOST}/api/saved_objects/_import?overwrite=true",
+                auth=(KIBANA_USER, KIBANA_PASS),
+                headers=headers,
+                files=files
+            )
+            
+        if resp.status_code == 200:
+            result = resp.json()
+            if result.get("success", False):
+                print("Data view and discover sessions imported into Kibana!")
+                if result.get("successCount", 0) > 0:
+                    print(f"Successfully imported {result['successCount']} objects")
+            else:
+                print(f"Import completed but with issues: {result}")
+        else:
+            print(f"Error importing NDJSON: {resp.status_code} -> {resp.text}")
+            # Try alternative approach without version header
+            print("Retrying without version header...")
+            
+            with open(ndjson_path, "rb") as f:
+                files = {
+                    "file": ("kibana_saved_objects.ndjson", f, "application/ndjson")
+                }
+                headers = {"kbn-xsrf": "true"}
+                
+                resp2 = requests.post(
+                    f"{KIBANA_HOST}/api/saved_objects/_import?overwrite=true",
+                    auth=(KIBANA_USER, KIBANA_PASS),
+                    headers=headers,
+                    files=files
+                )
+                
+            if resp2.status_code == 200:
+                result = resp2.json()
+                print("Data view and discover sessions imported into Kibana (retry successful)!")
+                if result.get("successCount", 0) > 0:
+                    print(f"Successfully imported {result['successCount']} objects")
+            else:
+                print(f"Retry also failed: {resp2.status_code} -> {resp2.text}")
+                print("\nManual import instructions:")
+                print(f"1. Open Kibana at {KIBANA_HOST}")
+                print("2. Go to Management > Saved Objects")
+                print(f"3. Click 'Import' and select: {ndjson_path}")
+                print("4. Enable 'Automatically overwrite conflicts'")
+                
+    except Exception as e:
+        print(f"Exception during import: {str(e)}")
+        print("\nManual import instructions:")
+        print(f"1. Open Kibana at {KIBANA_HOST}")
+        print("2. Go to Management > Saved Objects") 
+        print(f"3. Click 'Import' and select: {ndjson_path}")
+        print("4. Enable 'Automatically overwrite conflicts'")
 
 # ------------------------------------------------------------------------------
 # Main

@@ -2,7 +2,12 @@
 
 A powerful tool for generating **8 different types of synthetic observability and security data** with both **command-line** and **modern web interface** options. Generate realistic data for testing, development, and demonstration purposes across the entire observability stack.
 
-![Dashboard Overview](https://github.com/user-attachments/assets/aba8281e-d7e4-4809-b58b-cdd9ac2cea19)
+https://github.com/user-attachments/assets/37c71452-e8ae-4349-8c3e-f0ecee203df6
+
+Output:
+
+https://github.com/user-attachments/assets/3ffa5f55-6fac-48de-92b0-26396ed01839
+
 *Modern web interface dashboard - your control center for data generation*
 
 ## 🆕 8 Data Types Supported
@@ -20,9 +25,6 @@ This project now supports **8 comprehensive data types** covering the entire obs
 - **🛡️ Security Events** - SIEM-style security events with threat intelligence
 - **🚨 Alerts & Notifications** - Alert manager style alerts with firing/resolved states  
 - **🌐 Network Traffic** - Network flow logs with connection details and protocols
-
-![Data Type Selection](screenshots/data-type-selection.png)
-*Choose from 8 different data types with interactive selection interface*
 
 ## 🆕 New Web Interface
 
@@ -65,7 +67,8 @@ Open your browser and navigate to: **http://localhost:8080**
 3. **Test connections** to verify everything works
 4. **Start generating data!**
 
-![Configuration Screen](screenshots/configuration-screen.png)
+<img width="2726" height="1674" alt="CleanShot 2025-10-03 at 07 58 04@2x" src="https://github.com/user-attachments/assets/fd906599-a084-435c-8b9f-7603499efd0e" />
+
 *Easy-to-use configuration interface for Elasticsearch and Kibana*
 
 ## 📋 User Workflows
@@ -77,9 +80,6 @@ Open your browser and navigate to: **http://localhost:8080**
 3. **Test connections** to verify everything is working
 4. **Save configuration** for future use
 
-![Settings Flow](screenshots/settings-flow.png)
-*Step-by-step configuration process*
-
 ### Workflow 2: Generate Logs (CSV Only)
 
 Perfect for users who just want sample data files:
@@ -89,7 +89,6 @@ Perfect for users who just want sample data files:
 3. **Click "Start Generation"** → Watch real-time progress
 4. **Download your CSV** from the `output_csv/` directory
 
-![Generation Process](screenshots/generation-process.png)
 *Real-time progress tracking with detailed status updates*
 
 ### Workflow 3: Full Elasticsearch + Kibana Integration
@@ -105,7 +104,6 @@ For users who want the complete experience:
 4. **Monitor progress** → Automatic redirect to progress tracking
 5. **Access Kibana** → Your data view and discover sessions are ready!
 
-![Kibana Integration](screenshots/kibana-integration.png)
 *Pre-built Kibana discover sessions with DISSECT and GROK parsing examples*
 
 ### Workflow 4: Bulk Data Generation

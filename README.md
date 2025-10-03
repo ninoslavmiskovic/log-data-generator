@@ -2,7 +2,7 @@
 
 A powerful tool for generating **8 different types of synthetic observability and security data** with both **command-line** and **modern web interface** options. Generate realistic data for testing, development, and demonstration purposes across the entire observability stack.
 
-![Dashboard Overview](screenshots/dashboard-overview.png)
+![Dashboard Overview](https://github.com/user-attachments/assets/aba8281e-d7e4-4809-b58b-cdd9ac2cea19)
 *Modern web interface dashboard - your control center for data generation*
 
 ## 🆕 8 Data Types Supported

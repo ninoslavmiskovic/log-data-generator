@@ -3,225 +3,234 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Progress - Log Data Generator</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Progress — Log Data Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">
-                <i class="fas fa-chart-line me-2"></i>Log Data Generator
+                <span class="brand-icon"><i class="fas fa-chart-line"></i></span>
+                Log Data Generator
             </a>
-            <div class="navbar-nav ms-auto">
+            <div class="navbar-nav ms-auto d-flex flex-row">
                 <a class="nav-link" href="{{ url_for('index') }}">
-                    <i class="fas fa-home me-1"></i>Dashboard
+                    <i class="fas fa-house"></i>Dashboard
                 </a>
                 <a class="nav-link" href="{{ url_for('generate') }}">
-                    <i class="fas fa-play me-1"></i>Generate
+                    <i class="fas fa-play"></i>Generate
                 </a>
                 <a class="nav-link" href="{{ url_for('config') }}">
-                    <i class="fas fa-cog me-1"></i>Settings
+                    <i class="fas fa-gear"></i>Settings
                 </a>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
+    <div class="container mt-4 mb-5">
         <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <div class="card">
-                    <div class="card-header">
+            <div class="col-lg-7">
+
+                <!-- Status card -->
+                <div class="card mb-4 fade-in">
+                    <div class="card-header d-flex align-items-center justify-content-between">
                         <h4 class="card-title mb-0">
-                            <i class="fas fa-tasks me-2"></i>Operation Progress
+                            <i class="fas fa-circle-notch fa-spin text-primary me-2" id="header-icon"></i>
+                            Operation Progress
                         </h4>
+                        <span id="status-badge" class="badge" style="background:#e2e8f0;color:#64748b;font-size:0.72rem;">Running</span>
                     </div>
                     <div class="card-body">
-                        <div id="progress-container">
-                            <div class="text-center">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                                <p class="mt-3">Initializing operation...</p>
+
+                        <!-- Spinner while initialising -->
+                        <div id="progress-container" class="text-center py-4">
+                            <div class="spinner-ring mb-3"></div>
+                            <div class="text-muted" style="font-size:0.875rem">Initialising operation&hellip;</div>
+                        </div>
+
+                        <!-- Progress bar -->
+                        <div id="progress-bar-container" style="display:none;" class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span style="font-size:0.78rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;">Progress</span>
+                                <span id="progress-text" style="font-size:0.85rem;font-weight:700;color:#4f46e5;">0%</span>
+                            </div>
+                            <div class="progress" style="height:10px;">
+                                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                                     role="progressbar" style="width:0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
                             </div>
                         </div>
-                        
-                        <div id="progress-bar-container" class="mt-4" style="display: none;">
-                            <div class="progress mb-3" style="height: 25px;">
-                                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
-                                     role="progressbar" style="width: 0%">
-                                    <span id="progress-text">0%</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div id="status-message" class="alert alert-info" style="display: none;">
-                            <i class="fas fa-info-circle me-2"></i>
+
+                        <!-- Status message -->
+                        <div id="status-message" class="alert alert-info d-flex align-items-center gap-2" style="display:none!important;">
+                            <span class="status-dot running" id="status-dot"></span>
                             <span id="message-text"></span>
                         </div>
-                        
-                        <div id="completed-actions" class="mt-4" style="display: none;">
-                            <h6><i class="fas fa-check-circle text-success me-2"></i>Completed Actions:</h6>
-                            <ul id="actions-list" class="list-group"></ul>
+
+                        <!-- Success -->
+                        <div id="success-container" style="display:none;" class="fade-in">
+                            <div class="text-center py-2">
+                                <div style="width:68px;height:68px;background:#d1fae5;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.6rem;color:#059669;">
+                                    <i class="fas fa-check"></i>
+                                </div>
+                                <h5 style="font-weight:700;color:#065f46;margin-bottom:0.5rem;">Completed!</h5>
+                                <p id="success-text" class="text-muted mb-4" style="font-size:0.875rem;"></p>
+                                <div class="d-flex gap-2 justify-content-center">
+                                    <a href="{{ url_for('generate') }}" class="btn btn-primary">
+                                        <i class="fas fa-rotate-left me-1"></i>Generate More
+                                    </a>
+                                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                                        <i class="fas fa-house me-1"></i>Dashboard
+                                    </a>
+                                </div>
+                            </div>
                         </div>
-                        
-                        <div id="error-container" class="alert alert-danger" style="display: none;">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Error:</strong> <span id="error-text"></span>
-                        </div>
-                        
-                        <div id="success-container" class="alert alert-success" style="display: none;">
-                            <i class="fas fa-check-circle me-2"></i>
-                            <strong>Success:</strong> <span id="success-text"></span>
-                            <div class="mt-3">
-                                <a href="{{ url_for('generate') }}" class="btn btn-primary me-2">
-                                    <i class="fas fa-redo me-1"></i>Generate More Logs
-                                </a>
-                                <a href="{{ url_for('index') }}" class="btn btn-secondary">
-                                    <i class="fas fa-home me-1"></i>Back to Dashboard
+
+                        <!-- Error -->
+                        <div id="error-container" style="display:none;" class="fade-in">
+                            <div class="text-center py-2">
+                                <div style="width:68px;height:68px;background:#fee2e2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.6rem;color:#dc2626;">
+                                    <i class="fas fa-xmark"></i>
+                                </div>
+                                <h5 style="font-weight:700;color:#991b1b;margin-bottom:0.5rem;">Operation Failed</h5>
+                                <p id="error-text" class="text-muted mb-4" style="font-size:0.875rem;"></p>
+                                <a href="{{ url_for('generate') }}" class="btn btn-outline-danger">
+                                    <i class="fas fa-rotate-left me-1"></i>Try Again
                                 </a>
                             </div>
                         </div>
+
                     </div>
                 </div>
-                
-                <div class="card mt-4">
+
+                <!-- Timeline -->
+                <div class="card fade-in">
                     <div class="card-header">
                         <h5 class="card-title mb-0">
-                            <i class="fas fa-clock me-2"></i>Operation Timeline
+                            <i class="fas fa-clock-rotate-left text-primary me-2"></i>Timeline
                         </h5>
                     </div>
                     <div class="card-body">
                         <div id="timeline" class="timeline">
-                            <!-- Timeline items will be added dynamically -->
+                            <p class="text-muted mb-0" style="font-size:0.875rem;" id="timeline-empty">No events yet&hellip;</p>
                         </div>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const operationId = '{{ operation_id }}';
-        let timelineItems = [];
-        
+        const seenMessages = new Set();
+
         function updateProgress() {
             fetch(`/api/status/${operationId}`)
-                .then(response => response.json())
+                .then(r => r.json())
                 .then(data => {
-                    console.log('Status update:', data);
-                    
                     if (data.status === 'not_found') {
                         showError('Operation not found. Please start a new generation.');
                         return;
                     }
-                    
-                    // Update progress bar
-                    if (data.progress !== null && data.progress !== undefined) {
+
+                    // Progress bar
+                    if (data.progress != null) {
+                        const pct = Math.round(data.progress);
                         document.getElementById('progress-bar-container').style.display = 'block';
-                        document.getElementById('progress-bar').style.width = data.progress + '%';
-                        document.getElementById('progress-text').textContent = data.progress + '%';
+                        document.getElementById('progress-bar').style.width = pct + '%';
+                        document.getElementById('progress-bar').setAttribute('aria-valuenow', pct);
+                        document.getElementById('progress-text').textContent = pct + '%';
                     }
-                    
-                    // Update status message
+
+                    // Status message
                     if (data.message) {
-                        document.getElementById('status-message').style.display = 'block';
+                        const msgEl = document.getElementById('status-message');
+                        msgEl.style.display = 'flex';
                         document.getElementById('message-text').textContent = data.message;
-                        
-                        // Add to timeline
                         addTimelineItem(data.message, data.timestamp, data.status);
                     }
-                    
-                    // Handle different statuses
+
                     switch (data.status) {
                         case 'running':
-                            // Continue polling
                             setTimeout(updateProgress, 1000);
                             break;
                         case 'completed':
-                            showSuccess(data.message);
-                            document.getElementById('progress-bar').className = 'progress-bar bg-success';
+                            finishProgress('success', data.message);
                             break;
                         case 'error':
-                            showError(data.message);
-                            document.getElementById('progress-bar').className = 'progress-bar bg-danger';
+                            finishProgress('error', data.message);
                             break;
                         default:
                             setTimeout(updateProgress, 1000);
                     }
                 })
-                .catch(error => {
-                    console.error('Error fetching status:', error);
+                .catch(() => {
                     showError('Failed to get operation status. Please refresh the page.');
                 });
         }
-        
+
+        function finishProgress(type, message) {
+            const ok = type === 'success';
+            document.getElementById('progress-container').style.display = 'none';
+            document.getElementById('status-message').style.display = 'none';
+            document.getElementById('header-icon').className = `fas fa-${ok ? 'circle-check text-success' : 'circle-xmark text-danger'} me-2`;
+
+            const badge = document.getElementById('status-badge');
+            badge.style.background = ok ? '#d1fae5' : '#fee2e2';
+            badge.style.color = ok ? '#065f46' : '#991b1b';
+            badge.textContent = ok ? 'Completed' : 'Failed';
+
+            const bar = document.getElementById('progress-bar');
+            if (ok) {
+                bar.style.width = '100%';
+                bar.className = 'progress-bar bg-success';
+                bar.setAttribute('aria-valuenow', '100');
+                document.getElementById('progress-text').textContent = '100%';
+                document.getElementById('progress-bar-container').style.display = 'block';
+                document.getElementById('success-text').textContent = message;
+                document.getElementById('success-container').style.display = 'block';
+            } else {
+                bar.className = 'progress-bar bg-danger';
+                showError(message);
+            }
+        }
+
         function showError(message) {
             document.getElementById('progress-container').style.display = 'none';
-            document.getElementById('error-container').style.display = 'block';
+            document.getElementById('status-message').style.display = 'none';
             document.getElementById('error-text').textContent = message;
+            document.getElementById('error-container').style.display = 'block';
         }
-        
-        function showSuccess(message) {
-            document.getElementById('progress-container').style.display = 'none';
-            document.getElementById('success-container').style.display = 'block';
-            document.getElementById('success-text').textContent = message;
-        }
-        
+
         function addTimelineItem(message, timestamp, status) {
-            const timeline = document.getElementById('timeline');
-            const timeStr = new Date(timestamp).toLocaleTimeString();
-            
-            // Avoid duplicate timeline items
-            if (timelineItems.includes(message)) {
-                return;
-            }
-            timelineItems.push(message);
-            
-            const iconClass = status === 'error' ? 'fas fa-times-circle text-danger' : 
-                            status === 'completed' ? 'fas fa-check-circle text-success' : 
-                            'fas fa-info-circle text-primary';
-            
+            if (seenMessages.has(message)) return;
+            seenMessages.add(message);
+
+            const emptyMsg = document.getElementById('timeline-empty');
+            if (emptyMsg) emptyMsg.remove();
+
+            const dotClass   = status === 'error' ? 'dot-error' : status === 'completed' ? 'dot-success' : 'dot-running';
+            const iconClass  = status === 'error' ? 'fa-xmark' : status === 'completed' ? 'fa-check' : 'fa-ellipsis';
+            const timeStr    = timestamp ? new Date(timestamp).toLocaleTimeString() : '';
+
             const item = document.createElement('div');
-            item.className = 'timeline-item mb-3';
+            item.className = 'timeline-item slide-in';
             item.innerHTML = `
-                <div class="d-flex">
-                    <div class="flex-shrink-0">
-                        <i class="${iconClass} me-3"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                        <div class="fw-medium">${message}</div>
-                        <small class="text-muted">${timeStr}</small>
-                    </div>
-                </div>
-            `;
-            timeline.appendChild(item);
+                <div class="timeline-dot ${dotClass}"><i class="fas ${iconClass}"></i></div>
+                <div class="timeline-content">
+                    <div class="fw-medium">${message}</div>
+                    <div class="text-muted">${timeStr}</div>
+                </div>`;
+            document.getElementById('timeline').appendChild(item);
         }
-        
-        // Start progress monitoring
+
         setTimeout(updateProgress, 500);
     </script>
-    
-    <style>
-        .timeline-item {
-            border-left: 2px solid #dee2e6;
-            padding-left: 1rem;
-            margin-left: 1rem;
-        }
-        
-        .timeline-item:last-child {
-            border-left: none;
-        }
-        
-        .progress {
-            border-radius: 10px;
-        }
-        
-        .progress-bar {
-            border-radius: 10px;
-        }
-    </style>
 </body>
 </html>

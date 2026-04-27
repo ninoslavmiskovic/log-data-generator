@@ -3,36 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generate Logs - Log Data Generator</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>Generate Data — Log Data Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">
-                <i class="fas fa-chart-line me-2"></i>Log Data Generator
+                <span class="brand-icon"><i class="fas fa-chart-line"></i></span>
+                Log Data Generator
             </a>
-            <div class="navbar-nav ms-auto">
+            <div class="navbar-nav ms-auto d-flex flex-row">
                 <a class="nav-link" href="{{ url_for('index') }}">
-                    <i class="fas fa-home me-1"></i>Dashboard
+                    <i class="fas fa-house"></i>Dashboard
                 </a>
                 <a class="nav-link active" href="{{ url_for('generate') }}">
-                    <i class="fas fa-play me-1"></i>Generate
+                    <i class="fas fa-play"></i>Generate
                 </a>
                 <a class="nav-link" href="{{ url_for('config') }}">
-                    <i class="fas fa-cog me-1"></i>Settings
+                    <i class="fas fa-gear"></i>Settings
                 </a>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
+    <div class="container mt-4 mb-5">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
                     <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                        <i class="fas fa-{{ 'circle-xmark' if category == 'error' else 'circle-check' }} me-2"></i>
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
@@ -40,83 +45,83 @@
             {% endif %}
         {% endwith %}
 
-        <div class="row">
+        <div class="row g-4">
+            <!-- Main form -->
             <div class="col-lg-8">
-                <div class="card">
+                <div class="card fade-in">
                     <div class="card-header">
                         <h4 class="card-title mb-0">
-                            <i class="fas fa-play me-2"></i>Generate Log Data
+                            <i class="fas fa-play text-primary me-2"></i>Generate Log Data
                         </h4>
                     </div>
                     <div class="card-body">
-                        <form method="POST">
-                            <!-- Data Type Selection -->
-                            <div class="card mb-4">
-                                <div class="card-header bg-warning text-dark">
-                                    <h5 class="mb-0">
-                                        <i class="fas fa-database me-2"></i>Data Type Selection
-                                    </h5>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row" id="data-type-grid">
-                                        <!-- Data types will be populated by JavaScript -->
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Generation Parameters -->
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
+                        <form method="POST" id="generate-form">
+
+                            <!-- Data type grid -->
+                            <div class="section-label">Select Data Type</div>
+                            <div class="row g-2 mb-4" id="data-type-grid"></div>
+
+                            <!-- Parameters -->
+                            <div class="section-label">Parameters</div>
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-6">
                                     <label for="num_entries" class="form-label">Number of Entries</label>
-                                    <input type="number" class="form-control" id="num_entries" name="num_entries" 
-                                           value="{{ config.log_generation.default_entries }}" 
+                                    <input type="number" class="form-control" id="num_entries" name="num_entries"
+                                           value="{{ config.log_generation.default_entries }}"
                                            min="1" max="{{ config.log_generation.max_entries }}" required>
-                                    <div class="form-text">Maximum: {{ config.log_generation.max_entries }} entries</div>
+                                    <div class="form-text">Max: {{ config.log_generation.max_entries }}</div>
                                 </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Output Options</label>
-                                    <div class="form-check">
+                                <div class="col-md-6">
+                                    <label class="form-label">Output</label>
+                                    <div class="form-check mt-1">
                                         <input class="form-check-input" type="checkbox" id="generate_csv" name="generate_csv" checked>
                                         <label class="form-check-label" for="generate_csv">
-                                            <i class="fas fa-file-csv me-1"></i>Generate CSV file
+                                            <i class="fas fa-file-csv text-success me-1"></i>Export as CSV file
                                         </label>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="card mb-4">
-                                <div class="card-header bg-primary text-white">
-                                    <h5 class="mb-0">
-                                        <i class="fas fa-database me-2"></i>Elasticsearch Integration
-                                    </h5>
-                                </div>
+                            <!-- Integrations -->
+                            <div class="section-label">Integrations</div>
+                            <div class="card mb-4" style="border-color:#e0e7ff;background:#fafaff;">
                                 <div class="card-body">
-                                    <div class="form-check mb-3">
-                                        <input class="form-check-input" type="checkbox" id="ingest_to_es" name="ingest_to_es">
-                                        <label class="form-check-label" for="ingest_to_es">
-                                            <strong>Ingest logs into Elasticsearch</strong>
-                                        </label>
-                                        <div class="form-text">This will create an index called 'unstructured-logs' and bulk ingest all generated log entries.</div>
+                                    <div class="d-flex align-items-start gap-3 mb-3 pb-3" style="border-bottom:1px solid #e0e7ff;">
+                                        <div style="width:36px;height:36px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;">
+                                            <i class="fas fa-database text-primary"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="ingest_to_es" name="ingest_to_es">
+                                                <label class="form-check-label fw-semibold" for="ingest_to_es">
+                                                    Ingest into Elasticsearch
+                                                </label>
+                                            </div>
+                                            <div class="form-text">Bulk-ingest all generated entries into your Elasticsearch index.</div>
+                                        </div>
                                     </div>
-                                    
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="create_kibana_objects" name="create_kibana_objects">
-                                        <label class="form-check-label" for="create_kibana_objects">
-                                            <strong>Create Kibana saved objects</strong>
-                                        </label>
-                                        <div class="form-text">This will create a data view and 6 pre-built Discover sessions with DISSECT and GROK parsing examples.</div>
+                                    <div class="d-flex align-items-start gap-3">
+                                        <div style="width:36px;height:36px;border-radius:8px;background:#ecfdf5;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;">
+                                            <i class="fas fa-chart-bar text-success"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="create_kibana_objects" name="create_kibana_objects" disabled>
+                                                <label class="form-check-label fw-semibold" for="create_kibana_objects">
+                                                    Create Kibana Objects
+                                                </label>
+                                            </div>
+                                            <div class="form-text">Create a data view and 6 pre-built Discover sessions with DISSECT &amp; GROK examples.</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <small class="text-muted">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Generation time depends on the number of entries and selected options.
-                                    </small>
-                                </div>
-                                <button type="submit" class="btn btn-success btn-lg">
+                                <small class="text-muted">
+                                    <i class="fas fa-circle-info me-1"></i>Generation runs in the background.
+                                </small>
+                                <button type="submit" class="btn btn-primary btn-lg">
                                     <i class="fas fa-play me-2"></i>Start Generation
                                 </button>
                             </div>
@@ -124,260 +129,210 @@
                     </div>
                 </div>
             </div>
-            
+
+            <!-- Sidebar -->
             <div class="col-lg-4">
-                <div class="card">
+                <div class="card mb-3 fade-in">
                     <div class="card-header">
                         <h5 class="card-title mb-0">
-                            <i class="fas fa-info-circle me-2"></i>Available Data Types
+                            <i class="fas fa-circle-info text-primary me-2"></i>Data Type Details
                         </h5>
                     </div>
-                    <div class="card-body">
-                        <div id="selected-data-type-info">
-                            <p class="text-muted">Select a data type to see details here.</p>
-                        </div>
+                    <div class="card-body" id="selected-data-type-info">
+                        <p class="text-muted mb-0" style="font-size:0.875rem">Select a data type to see details.</p>
                     </div>
                 </div>
-                
-                <div class="card mt-3">
+
+                <div class="card fade-in">
                     <div class="card-header">
                         <h5 class="card-title mb-0">
-                            <i class="fas fa-chart-bar me-2"></i>Kibana Integration
+                            <i class="fas fa-chart-bar text-success me-2"></i>Kibana Objects
                         </h5>
                     </div>
                     <div class="card-body">
-                        <p class="small">When you enable Kibana integration, the following will be created:</p>
-                        
-                        <h6 class="small">Data View:</h6>
-                        <ul class="small">
-                            <li>Index pattern: <code>unstructured-logs</code></li>
+                        <p class="text-muted mb-3" style="font-size:0.82rem">When Kibana integration is enabled:</p>
+
+                        <div class="section-label">Data View</div>
+                        <ul class="small mb-3">
+                            <li>Pattern: <code>unstructured-logs</code></li>
                             <li>Time field: <code>@timestamp</code></li>
                         </ul>
-                        
-                        <h6 class="small">Discover Sessions:</h6>
-                        <ul class="small">
+
+                        <div class="section-label">Discover Sessions</div>
+                        <ul class="small mb-0">
                             <li>Retrieve All Logs</li>
-                            <li>Count Logs by Level</li>
-                            <li>Count Logs by Source</li>
+                            <li>Count by Level</li>
+                            <li>Count by Source</li>
                             <li>Retrieve Error Logs</li>
                             <li>Parse AuthService (DISSECT)</li>
                             <li>Parse AuthService (GROK)</li>
                         </ul>
-                        
-                        <div class="alert alert-info small mt-2">
-                            <i class="fas fa-lightbulb me-1"></i>
-                            These sessions demonstrate ES|QL query capabilities including DISSECT and GROK parsing.
-                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Data types configuration
         const dataTypes = {
             'unstructured_logs': {
-                name: 'Unstructured Logs',
+                name: 'Unstructured Logs', icon: 'fas fa-file-lines',
+                iconBg: 'bg-primary-soft', iconColor: 'text-primary',
                 description: 'Traditional log files with free-form text messages',
-                icon: 'fas fa-file-alt',
                 details: {
                     'Sources': ['AuthService', 'PaymentService', 'DatabaseService', 'NotificationService', 'CacheService'],
                     'Levels': ['INFO (70%)', 'WARN (10%)', 'ERROR (10%)', 'DEBUG (10%)'],
-                    'Features': ['Realistic timestamps', 'Error spikes', 'Dynamic templates', 'Fake user data']
+                    'Features': ['Realistic timestamps', 'Error spikes', 'Dynamic templates']
                 }
             },
             'structured_logs': {
-                name: 'Structured Logs',
+                name: 'Structured Logs', icon: 'fas fa-code',
+                iconBg: 'bg-info-soft', iconColor: 'text-info',
                 description: 'JSON-formatted logs with consistent fields and metadata',
-                icon: 'fas fa-code',
                 details: {
-                    'Services': ['user-api', 'order-service', 'inventory-service', 'notification-service'],
-                    'Fields': ['trace.id', 'span.id', 'user.id', 'http.status_code', 'response_time_ms'],
+                    'Services': ['user-api', 'order-service', 'inventory-service'],
+                    'Fields': ['trace.id', 'span.id', 'user.id', 'http.status_code'],
                     'Environments': ['production', 'staging', 'development']
                 }
             },
             'distributed_traces': {
-                name: 'Distributed Traces',
-                description: 'OpenTelemetry-style tracing data showing request flows across services',
-                icon: 'fas fa-project-diagram',
+                name: 'Distributed Traces', icon: 'fas fa-diagram-project',
+                iconBg: 'bg-purple-soft', iconColor: 'text-purple',
+                description: 'OpenTelemetry-style tracing with parent-child relationships',
                 details: {
                     'Services': ['frontend', 'user-service', 'order-service', 'payment-service'],
-                    'Operations': ['authenticate', 'create_order', 'process_payment', 'send_notification'],
-                    'Formats': ['OpenTelemetry compatible', 'Parent-child relationships', 'Span attributes']
+                    'Operations': ['authenticate', 'create_order', 'process_payment'],
+                    'Formats': ['OpenTelemetry compatible', 'Parent-child spans']
                 }
             },
             'metrics': {
-                name: 'Metrics & Time Series',
-                description: 'Counter, gauge, histogram and summary metrics from applications and infrastructure',
-                icon: 'fas fa-chart-line',
+                name: 'Metrics & Time Series', icon: 'fas fa-chart-line',
+                iconBg: 'bg-success-soft', iconColor: 'text-success',
+                description: 'Counter, gauge, histogram and summary metrics',
                 details: {
                     'Types': ['Counter', 'Gauge', 'Histogram', 'Summary'],
-                    'Sources': ['Frontend', 'API Gateway', 'Database', 'User Service'],
-                    'Examples': ['response_time', 'cpu_usage_percent', 'requests_total', 'memory_usage_bytes']
+                    'Sources': ['Frontend', 'API Gateway', 'Database'],
+                    'Examples': ['response_time', 'cpu_usage_percent', 'requests_total']
                 }
             },
             'security_events': {
-                name: 'Security Events',
-                description: 'SIEM-style security events including authentication, network, and threat data',
-                icon: 'fas fa-shield-alt',
+                name: 'Security Events', icon: 'fas fa-shield-halved',
+                iconBg: 'bg-danger-soft', iconColor: 'text-danger',
+                description: 'SIEM-style security events including threats and authentication',
                 details: {
                     'Event Types': ['Authentication', 'Network', 'Malware', 'Data Access'],
                     'Severities': ['Low', 'Medium', 'High', 'Critical'],
-                    'Attack Types': ['Brute Force', 'SQL Injection', 'XSS', 'Malware', 'DDoS']
+                    'Attack Types': ['Brute Force', 'SQL Injection', 'XSS', 'DDoS']
                 }
             },
             'alerts': {
-                name: 'Alerts & Notifications',
+                name: 'Alerts & Notifications', icon: 'fas fa-bell',
+                iconBg: 'bg-warning-soft', iconColor: 'text-warning',
                 description: 'Alert manager style alerts with firing and resolved states',
-                icon: 'fas fa-bell',
                 details: {
-                    'Alert Types': ['HighCPUUsage', 'ServiceDown', 'HighErrorRate', 'SecurityBreach'],
+                    'Alert Types': ['HighCPUUsage', 'ServiceDown', 'HighErrorRate'],
                     'States': ['Firing', 'Resolved'],
                     'Severities': ['Warning', 'Critical']
                 }
             },
             'network_traffic': {
-                name: 'Network Traffic',
-                description: 'Network flow logs with connection details, protocols, and traffic analysis',
-                icon: 'fas fa-network-wired',
+                name: 'Network Traffic', icon: 'fas fa-network-wired',
+                iconBg: 'bg-info-soft', iconColor: 'text-info',
+                description: 'Network flow logs with connection details and protocols',
                 details: {
                     'Protocols': ['TCP', 'UDP', 'ICMP'],
                     'Directions': ['Inbound', 'Outbound', 'Internal'],
-                    'Data': ['Bytes transferred', 'Packet counts', 'Duration', 'Geo location']
+                    'Data': ['Bytes transferred', 'Packet counts', 'Duration']
                 }
             },
             'apm_data': {
-                name: 'APM Data',
-                description: 'Application Performance Monitoring data with transactions, errors, and traces',
-                icon: 'fas fa-tachometer-alt',
+                name: 'APM Data', icon: 'fas fa-gauge-high',
+                iconBg: 'bg-success-soft', iconColor: 'text-success',
+                description: 'Application Performance Monitoring with transactions and errors',
                 details: {
                     'Transaction Types': ['Request', 'Database Query', 'Background Job'],
-                    'Services': ['Web App', 'API Service', 'Worker', 'Database'],
-                    'Metrics': ['Duration', 'Error rates', 'Throughput', 'Resource usage']
+                    'Services': ['Web App', 'API Service', 'Worker'],
+                    'Metrics': ['Duration', 'Error rates', 'Throughput']
                 }
             }
         };
 
         let selectedDataType = 'unstructured_logs';
 
-        function initializeDataTypeGrid() {
+        function initGrid() {
             const grid = document.getElementById('data-type-grid');
             grid.innerHTML = '';
-
-            for (const [key, dataType] of Object.entries(dataTypes)) {
+            for (const [key, dt] of Object.entries(dataTypes)) {
                 const col = document.createElement('div');
-                col.className = 'col-md-6 col-lg-4 mb-3';
-                
+                col.className = 'col-6 col-md-4 col-lg-3';
                 col.innerHTML = `
-                    <div class="data-type-card ${key === selectedDataType ? 'selected' : ''}" data-type="${key}">
-                        <div class="card h-100 cursor-pointer">
-                            <div class="card-body text-center">
-                                <i class="${dataType.icon} fa-2x mb-2 text-primary"></i>
-                                <h6 class="card-title">${dataType.name}</h6>
-                                <p class="card-text small text-muted">${dataType.description}</p>
+                    <div class="data-type-card ${key === selectedDataType ? 'selected' : ''}" data-type="${key}" role="button" tabindex="0">
+                        <div class="card h-100 text-center p-1">
+                            <div class="card-body p-2">
+                                <div class="dt-icon ${dt.iconBg} ${dt.iconColor} mx-auto mb-2">
+                                    <i class="${dt.icon}"></i>
+                                </div>
+                                <div style="font-size:0.75rem;font-weight:600;color:#0f172a;line-height:1.3;">${dt.name}</div>
                             </div>
                         </div>
-                        <input type="radio" name="data_type" value="${key}" ${key === selectedDataType ? 'checked' : ''} style="display: none;">
-                    </div>
-                `;
-                
+                        <input type="radio" name="data_type" value="${key}" ${key === selectedDataType ? 'checked' : ''} style="display:none">
+                    </div>`;
                 grid.appendChild(col);
             }
-
-            // Add click handlers
             document.querySelectorAll('.data-type-card').forEach(card => {
-                card.addEventListener('click', function() {
-                    selectDataType(this.dataset.type);
+                card.addEventListener('click', () => selectDataType(card.dataset.type));
+                card.addEventListener('keydown', e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectDataType(card.dataset.type);
+                    }
                 });
             });
-
-            updateDataTypeInfo();
+            updateInfo();
         }
 
         function selectDataType(type) {
             selectedDataType = type;
-            
-            // Update UI
-            document.querySelectorAll('.data-type-card').forEach(card => {
-                card.classList.remove('selected');
-                card.querySelector('input[type="radio"]').checked = false;
+            document.querySelectorAll('.data-type-card').forEach(c => {
+                c.classList.remove('selected');
+                c.querySelector('input').checked = false;
             });
-            
-            document.querySelector(`[data-type="${type}"]`).classList.add('selected');
-            document.querySelector(`[data-type="${type}"] input[type="radio"]`).checked = true;
-            
-            updateDataTypeInfo();
+            const card = document.querySelector(`[data-type="${type}"]`);
+            card.classList.add('selected');
+            card.querySelector('input').checked = true;
+            updateInfo();
         }
 
-        function updateDataTypeInfo() {
-            const dataType = dataTypes[selectedDataType];
-            const infoDiv = document.getElementById('selected-data-type-info');
-            
+        function updateInfo() {
+            const dt = dataTypes[selectedDataType];
             let html = `
                 <div class="text-center mb-3">
-                    <i class="${dataType.icon} fa-2x text-primary mb-2"></i>
-                    <h6>${dataType.name}</h6>
-                    <p class="small text-muted">${dataType.description}</p>
-                </div>
-            `;
-            
-            for (const [category, items] of Object.entries(dataType.details)) {
-                html += `<h6 class="small fw-bold">${category}:</h6>`;
-                html += '<ul class="small">';
-                items.forEach(item => {
-                    html += `<li>${item}</li>`;
-                });
+                    <div class="dt-icon ${dt.iconBg} ${dt.iconColor} mx-auto mb-2"><i class="${dt.icon}"></i></div>
+                    <div style="font-weight:600;font-size:0.925rem;">${dt.name}</div>
+                    <div class="text-muted mt-1" style="font-size:0.8rem;">${dt.description}</div>
+                </div>`;
+            for (const [cat, items] of Object.entries(dt.details)) {
+                html += `<div class="section-label">${cat}</div><ul class="small mb-2">`;
+                items.forEach(i => { html += `<li>${i}</li>`; });
                 html += '</ul>';
             }
-            
-            infoDiv.innerHTML = html;
+            document.getElementById('selected-data-type-info').innerHTML = html;
         }
 
-        // Enable/disable Kibana objects checkbox based on ES ingestion
-        document.getElementById('ingest_to_es').addEventListener('change', function() {
-            const kibanaCheckbox = document.getElementById('create_kibana_objects');
-            if (this.checked) {
-                kibanaCheckbox.disabled = false;
-            } else {
-                kibanaCheckbox.disabled = true;
-                kibanaCheckbox.checked = false;
-            }
-        });
-        
-        // Initialize everything when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeDataTypeGrid();
-            
-            // Initialize the Kibana checkbox state
-            document.getElementById('create_kibana_objects').disabled = !document.getElementById('ingest_to_es').checked;
+        function updateKibanaObjectsState() {
+            const ingestToEs = document.getElementById('ingest_to_es');
+            const kb = document.getElementById('create_kibana_objects');
+            kb.disabled = !ingestToEs.checked;
+            if (!ingestToEs.checked) kb.checked = false;
+        }
+
+        document.getElementById('ingest_to_es').addEventListener('change', updateKibanaObjectsState);
+
+        document.addEventListener('DOMContentLoaded', function () {
+            initGrid();
+            updateKibanaObjectsState();
         });
     </script>
-    
-    <style>
-        .data-type-card {
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .data-type-card:hover .card {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
-        
-        .data-type-card.selected .card {
-            border: 2px solid #0d6efd;
-            background-color: #f8f9ff;
-        }
-        
-        .data-type-card.selected .card-body i {
-            color: #0d6efd !important;
-        }
-        
-        .cursor-pointer {
-            cursor: pointer;
-        }
-    </style>
 </body>
 </html>

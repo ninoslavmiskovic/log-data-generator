@@ -3,7 +3,6 @@ import random
 import datetime
 import os
 import json
-import uuid
 import requests
 from faker import Faker
 
@@ -69,7 +68,7 @@ messages = {
 def random_timestamp(start, end):
     return start + datetime.timedelta(seconds=random.randint(0, int((end - start).total_seconds())))
 
-def generate_logs(num_entries=10000000000000):
+def generate_logs(num_entries=1000):
     """
     Generates log docs in memory, writes them to CSV,
     and returns a list of doc dicts for ingestion.

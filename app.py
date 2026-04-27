@@ -1,19 +1,14 @@
 import json
 import os
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_session import Session
 import tempfile
 import threading
 import uuid
-from werkzeug.security import generate_password_hash, check_password_hash
-
 # Import the log generation functions and data generators
-from generate_logs import (
-    ingest_logs_to_es, create_data_view_so_7_11,
-    generate_discover_sessions_7_11, write_and_import_so
-)
+from generate_logs import create_data_view_so_7_11
 from data_generators import DATA_GENERATORS
 
 app = Flask(__name__)
@@ -52,7 +47,7 @@ def load_config():
         try:
             with open(CONFIG_FILE, 'r') as f:
                 return json.load(f)
-        except:
+        except (json.JSONDecodeError, IOError, OSError):
             return DEFAULT_CONFIG.copy()
     return DEFAULT_CONFIG.copy()
 
@@ -116,12 +111,20 @@ def generate():
     
     if request.method == 'POST':
         try:
-            num_entries = int(request.form.get('num_entries', config['log_generation']['default_entries']))
+            try:
+                num_entries = int(request.form.get('num_entries', config['log_generation']['default_entries']))
+            except (ValueError, TypeError):
+                flash('Number of entries must be a valid integer', 'error')
+                return render_template('generate.html', config=config, data_generators=DATA_GENERATORS)
             data_type = request.form.get('data_type', 'unstructured_logs')
             generate_csv = request.form.get('generate_csv') == 'on'
             ingest_to_es = request.form.get('ingest_to_es') == 'on'
             create_kibana_objects = request.form.get('create_kibana_objects') == 'on'
-            
+
+            if num_entries <= 0:
+                flash('Number of entries must be greater than 0', 'error')
+                return render_template('generate.html', config=config, data_generators=DATA_GENERATORS)
+
             if num_entries > config['log_generation']['max_entries']:
                 flash(f'Number of entries cannot exceed {config["log_generation"]["max_entries"]}', 'error')
                 return render_template('generate.html', config=config, data_generators=DATA_GENERATORS)
@@ -524,8 +527,6 @@ def create_kibana_objects_for_data_type(data_type, index_name, config):
 
 def import_kibana_objects_improved(objects, config):
     """Improved Kibana objects import with better error handling"""
-    import tempfile
-    
     # Create temporary NDJSON file
     with tempfile.NamedTemporaryFile(mode='w+', suffix='.ndjson', delete=False) as f:
         for obj in objects:
@@ -583,10 +584,9 @@ def import_kibana_objects_improved(objects, config):
         print(f"Exception during Kibana import: {str(e)}")
     finally:
         # Clean up temp file
-        import os
         try:
             os.unlink(temp_path)
-        except:
+        except OSError:
             pass
 
 if __name__ == '__main__':

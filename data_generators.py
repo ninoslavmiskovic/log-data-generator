@@ -1,9 +1,6 @@
-import json
 import random
 import datetime
-import uuid
 from faker import Faker
-import ipaddress
 
 fake = Faker()
 

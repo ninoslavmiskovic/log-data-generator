@@ -84,13 +84,13 @@
                                             <label for="es_password" class="form-label">Password</label>
                                             <div class="input-group">
                                                 <input type="password" class="form-control" id="es_password" name="es_password"
-                                                       value="{{ config.elasticsearch.password }}"
-                                                       placeholder="••••••••" required>
+                                                       placeholder="Leave blank to keep current password">
                                                 <button class="btn btn-outline-secondary" type="button"
                                                         onclick="togglePw('es_password', this)" title="Toggle visibility">
                                                     <i class="fas fa-eye"></i>
                                                 </button>
                                             </div>
+                                            <div class="form-text">Leave blank to keep the existing password.</div>
                                         </div>
                                     </div>
                                 </div>
@@ -123,13 +123,13 @@
                                             <label for="kibana_password" class="form-label">Password</label>
                                             <div class="input-group">
                                                 <input type="password" class="form-control" id="kibana_password" name="kibana_password"
-                                                       value="{{ config.kibana.password }}"
-                                                       placeholder="••••••••" required>
+                                                       placeholder="Leave blank to keep current password">
                                                 <button class="btn btn-outline-secondary" type="button"
                                                         onclick="togglePw('kibana_password', this)" title="Toggle visibility">
                                                     <i class="fas fa-eye"></i>
                                                 </button>
                                             </div>
+                                            <div class="form-text">Leave blank to keep the existing password.</div>
                                         </div>
                                     </div>
                                 </div>

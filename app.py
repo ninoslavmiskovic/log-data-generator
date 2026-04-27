@@ -7,6 +7,7 @@ from flask_session import Session
 import tempfile
 import threading
 import uuid
+import requests
 # Import the log generation functions and data generators
 from generate_logs import create_data_view_so_7_11
 from data_generators import DATA_GENERATORS
@@ -47,7 +48,7 @@ def load_config():
         try:
             with open(CONFIG_FILE, 'r') as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError, OSError):
+        except (json.JSONDecodeError, OSError):
             return DEFAULT_CONFIG.copy()
     return DEFAULT_CONFIG.copy()
 
@@ -79,16 +80,19 @@ def config():
     """Configuration page"""
     if request.method == 'POST':
         try:
+            existing = load_config()
+            es_pw = request.form.get('es_password', '').strip()
+            kb_pw = request.form.get('kibana_password', '').strip()
             new_config = {
                 'elasticsearch': {
                     'host': request.form.get('es_host', '').strip(),
                     'username': request.form.get('es_username', '').strip(),
-                    'password': request.form.get('es_password', '').strip()
+                    'password': es_pw if es_pw else existing['elasticsearch']['password']
                 },
                 'kibana': {
                     'host': request.form.get('kibana_host', '').strip(),
                     'username': request.form.get('kibana_username', '').strip(),
-                    'password': request.form.get('kibana_password', '').strip()
+                    'password': kb_pw if kb_pw else existing['kibana']['password']
                 },
                 'log_generation': {
                     'default_entries': int(request.form.get('default_entries', 1000)),
@@ -169,9 +173,7 @@ def test_connection():
     """Test Elasticsearch and Kibana connections"""
     config = load_config()
     results = {}
-    
-    import requests
-    
+
     # Test Elasticsearch
     try:
         es_url = f"{config['elasticsearch']['host']}/_cluster/health"
@@ -319,8 +321,6 @@ def flatten_dict(d, parent_key='', sep='.'):
 
 def ingest_data_to_es(entries, index_name, data_type, config):
     """Ingest data entries into Elasticsearch"""
-    import requests
-    
     es_host = config['elasticsearch']['host']
     es_user = config['elasticsearch']['username']
     es_pass = config['elasticsearch']['password']

@@ -282,7 +282,12 @@
             }
             document.querySelectorAll('.data-type-card').forEach(card => {
                 card.addEventListener('click', () => selectDataType(card.dataset.type));
-                card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') selectDataType(card.dataset.type); });
+                card.addEventListener('keydown', e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectDataType(card.dataset.type);
+                    }
+                });
             });
             updateInfo();
         }
@@ -315,13 +320,19 @@
             document.getElementById('selected-data-type-info').innerHTML = html;
         }
 
-        document.getElementById('ingest_to_es').addEventListener('change', function () {
+        function updateKibanaObjectsState() {
+            const ingestToEs = document.getElementById('ingest_to_es');
             const kb = document.getElementById('create_kibana_objects');
-            kb.disabled = !this.checked;
-            if (!this.checked) kb.checked = false;
-        });
+            kb.disabled = !ingestToEs.checked;
+            if (!ingestToEs.checked) kb.checked = false;
+        }
 
-        document.addEventListener('DOMContentLoaded', initGrid);
+        document.getElementById('ingest_to_es').addEventListener('change', updateKibanaObjectsState);
+
+        document.addEventListener('DOMContentLoaded', function () {
+            initGrid();
+            updateKibanaObjectsState();
+        });
     </script>
 </body>
 </html>

@@ -458,6 +458,13 @@ body {
   transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.progress-bar.bg-success,
+.progress-bar.bg-danger,
+.progress-bar.bg-info,
+.progress-bar.bg-warning {
+  background-image: none;
+}
+
 /* ─── Timeline ──────────────────────────────────────────────── */
 .timeline { position: relative; }
 

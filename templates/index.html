@@ -4,35 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log Data Generator</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">
-                <i class="fas fa-chart-line me-2"></i>Log Data Generator
+                <span class="brand-icon"><i class="fas fa-chart-line"></i></span>
+                Log Data Generator
             </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="{{ url_for('index') }}">
-                    <i class="fas fa-home me-1"></i>Dashboard
+            <div class="navbar-nav ms-auto d-flex flex-row">
+                <a class="nav-link active" href="{{ url_for('index') }}">
+                    <i class="fas fa-house"></i>Dashboard
                 </a>
                 <a class="nav-link" href="{{ url_for('generate') }}">
-                    <i class="fas fa-play me-1"></i>Generate
+                    <i class="fas fa-play"></i>Generate
                 </a>
                 <a class="nav-link" href="{{ url_for('config') }}">
-                    <i class="fas fa-cog me-1"></i>Settings
+                    <i class="fas fa-gear"></i>Settings
                 </a>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
+    <div class="container mt-4 mb-5">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show fade-in" role="alert">
+                        <i class="fas fa-{{ 'circle-xmark' if category == 'error' else 'circle-check' }} me-2"></i>
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
@@ -40,117 +45,211 @@
             {% endif %}
         {% endwith %}
 
-        <div class="row">
-            <div class="col-lg-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="card-title mb-0">
-                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                        </h4>
+        <!-- Hero -->
+        <div class="hero fade-in">
+            <div class="hero-icon"><i class="fas fa-chart-line"></i></div>
+            <h1>Log Data Generator</h1>
+            <p>Generate realistic observability data — logs, traces, metrics, and security events — and stream it directly into your Elasticsearch stack.</p>
+        </div>
+
+        <!-- Stats row -->
+        <div class="row g-3 mb-4 fade-in">
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-icon bg-primary-soft text-primary">
+                        <i class="fas fa-layer-group"></i>
                     </div>
-                    <div class="card-body">
-                        <p class="card-text">Welcome to the Log Data Generator web interface. This tool helps you generate synthetic log data and ingest it into your Elasticsearch cluster for testing and development purposes.</p>
-                        
-                        <div class="row mt-4">
-                            <div class="col-md-6 mb-3">
-                                <div class="card bg-primary text-white h-100">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-play fa-2x mb-2"></i>
-                                        <h5>Generate Logs</h5>
-                                        <p>Create synthetic log data with configurable parameters</p>
-                                        <a href="{{ url_for('generate') }}" class="btn btn-light">Start Generation</a>
-                                    </div>
-                                </div>
+                    <div class="stat-value">8</div>
+                    <div class="stat-label">Data Types</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-icon bg-success-soft text-success">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <div class="stat-value">{{ config.log_generation.max_entries }}</div>
+                    <div class="stat-label">Max Entries</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-icon bg-purple-soft text-purple">
+                        <i class="fas fa-clock-rotate-left"></i>
+                    </div>
+                    <div class="stat-value">Live</div>
+                    <div class="stat-label">Progress Tracking</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Left column -->
+            <div class="col-lg-8">
+                <div class="section-label">Quick Actions</div>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <a href="{{ url_for('generate') }}" class="action-card">
+                            <div class="action-icon bg-primary-soft text-primary">
+                                <i class="fas fa-play fa-lg"></i>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="card bg-success text-white h-100">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-cog fa-2x mb-2"></i>
-                                        <h5>Configuration</h5>
-                                        <p>Configure Elasticsearch and Kibana connection settings</p>
-                                        <a href="{{ url_for('config') }}" class="btn btn-light">Configure</a>
-                                    </div>
-                                </div>
+                            <h5>Generate Data</h5>
+                            <p>Create synthetic log data with configurable parameters and ingest it into Elasticsearch.</p>
+                            <span class="action-arrow text-primary">
+                                Get started <i class="fas fa-arrow-right"></i>
+                            </span>
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <a href="{{ url_for('config') }}" class="action-card">
+                            <div class="action-icon bg-success-soft text-success">
+                                <i class="fas fa-gear fa-lg"></i>
+                            </div>
+                            <h5>Configure</h5>
+                            <p>Set up Elasticsearch and Kibana connection settings for data ingestion.</p>
+                            <span class="action-arrow text-success">
+                                Open settings <i class="fas fa-arrow-right"></i>
+                            </span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Data types showcase -->
+                <div class="section-label">Supported Data Types</div>
+                <div class="card">
+                    <div class="card-body py-1">
+                        <div class="row g-0">
+                            <div class="col-6 col-md-3 p-3 text-center">
+                                <div class="dt-icon bg-primary-soft text-primary mx-auto mb-2"><i class="fas fa-file-lines"></i></div>
+                                <div style="font-size:0.78rem;font-weight:600;">Unstructured Logs</div>
+                            </div>
+                            <div class="col-6 col-md-3 p-3 text-center">
+                                <div class="dt-icon bg-info-soft text-info mx-auto mb-2"><i class="fas fa-code"></i></div>
+                                <div style="font-size:0.78rem;font-weight:600;">Structured Logs</div>
+                            </div>
+                            <div class="col-6 col-md-3 p-3 text-center">
+                                <div class="dt-icon bg-purple-soft text-purple mx-auto mb-2"><i class="fas fa-diagram-project"></i></div>
+                                <div style="font-size:0.78rem;font-weight:600;">Distributed Traces</div>
+                            </div>
+                            <div class="col-6 col-md-3 p-3 text-center">
+                                <div class="dt-icon bg-success-soft text-success mx-auto mb-2"><i class="fas fa-chart-line"></i></div>
+                                <div style="font-size:0.78rem;font-weight:600;">Metrics</div>
+                            </div>
+                            <div class="col-6 col-md-3 p-3 text-center">
+                                <div class="dt-icon bg-danger-soft text-danger mx-auto mb-2"><i class="fas fa-shield-halved"></i></div>
+                                <div style="font-size:0.78rem;font-weight:600;">Security Events</div>
+                            </div>
+                            <div class="col-6 col-md-3 p-3 text-center">
+                                <div class="dt-icon bg-warning-soft text-warning mx-auto mb-2"><i class="fas fa-bell"></i></div>
+                                <div style="font-size:0.78rem;font-weight:600;">Alerts</div>
+                            </div>
+                            <div class="col-6 col-md-3 p-3 text-center">
+                                <div class="dt-icon bg-info-soft text-info mx-auto mb-2"><i class="fas fa-network-wired"></i></div>
+                                <div style="font-size:0.78rem;font-weight:600;">Network Traffic</div>
+                            </div>
+                            <div class="col-6 col-md-3 p-3 text-center">
+                                <div class="dt-icon bg-success-soft text-success mx-auto mb-2"><i class="fas fa-gauge-high"></i></div>
+                                <div style="font-size:0.78rem;font-weight:600;">APM Data</div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            
+
+            <!-- Right column -->
             <div class="col-lg-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-info-circle me-2"></i>Current Configuration
-                        </h5>
-                    </div>
+                <div class="section-label">Current Configuration</div>
+                <div class="card mb-3">
                     <div class="card-body">
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Elasticsearch:</label>
-                            <div class="text-muted">{{ config.elasticsearch.host }}</div>
+                            <div class="section-label">Elasticsearch</div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="status-dot" id="es-dot" style="background:#cbd5e1;"></span>
+                                <code style="font-size:0.8rem;color:#475569;word-break:break-all;">{{ config.elasticsearch.host }}</code>
+                            </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Kibana:</label>
-                            <div class="text-muted">{{ config.kibana.host }}</div>
+                            <div class="section-label">Kibana</div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="status-dot" id="kb-dot" style="background:#cbd5e1;"></span>
+                                <code style="font-size:0.8rem;color:#475569;word-break:break-all;">{{ config.kibana.host }}</code>
+                            </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Default Entries:</label>
-                            <div class="text-muted">{{ config.log_generation.default_entries }}</div>
+                            <div class="section-label">Default Entries</div>
+                            <span class="badge bg-primary">{{ config.log_generation.default_entries }}</span>
                         </div>
-                        <div class="mt-3">
-                            <button class="btn btn-outline-primary btn-sm" onclick="testConnections()">
-                                <i class="fas fa-network-wired me-1"></i>Test Connections
-                            </button>
-                        </div>
-                        <div id="connection-status" class="mt-2"></div>
+                        <button class="btn btn-outline-primary btn-sm w-100" onclick="testConnections()">
+                            <i class="fas fa-plug me-1"></i>Test Connections
+                        </button>
+                        <div id="connection-status" class="mt-3"></div>
                     </div>
                 </div>
-                
-                <div class="card mt-3">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-question-circle me-2"></i>Features
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <ul class="list-unstyled">
-                            <li><i class="fas fa-check text-success me-2"></i>Generate synthetic logs</li>
-                            <li><i class="fas fa-check text-success me-2"></i>Multiple log levels & sources</li>
-                            <li><i class="fas fa-check text-success me-2"></i>CSV export</li>
-                            <li><i class="fas fa-check text-success me-2"></i>Elasticsearch ingestion</li>
-                            <li><i class="fas fa-check text-success me-2"></i>Kibana saved objects</li>
-                            <li><i class="fas fa-check text-success me-2"></i>Real-time progress tracking</li>
-                        </ul>
+
+                <div class="section-label">Capabilities</div>
+                <div class="card">
+                    <div class="card-body py-0 px-3">
+                        <div class="feature-item">
+                            <span class="feature-check"><i class="fas fa-check"></i></span>
+                            Realistic synthetic data generation
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-check"><i class="fas fa-check"></i></span>
+                            Multiple log levels &amp; sources
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-check"><i class="fas fa-check"></i></span>
+                            CSV export
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-check"><i class="fas fa-check"></i></span>
+                            Elasticsearch bulk ingestion
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-check"><i class="fas fa-check"></i></span>
+                            Kibana saved objects
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-check"><i class="fas fa-check"></i></span>
+                            Real-time progress tracking
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function testConnections() {
             const statusDiv = document.getElementById('connection-status');
-            statusDiv.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div> Testing connections...';
-            
-            fetch('/test-connection', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                let html = '';
-                for (const [service, result] of Object.entries(data)) {
-                    const iconClass = result.status === 'success' ? 'fas fa-check-circle text-success' : 'fas fa-times-circle text-danger';
-                    html += `<div class="mt-2"><i class="${iconClass} me-2"></i><strong>${service}:</strong> ${result.message}</div>`;
-                }
-                statusDiv.innerHTML = html;
-            })
-            .catch(error => {
-                statusDiv.innerHTML = '<div class="text-danger">Error testing connections</div>';
-            });
+            statusDiv.innerHTML = '<div class="d-flex align-items-center gap-2 text-muted" style="font-size:0.85rem"><div class="spinner-border spinner-border-sm" role="status"></div> Testing&hellip;</div>';
+
+            fetch('/test-connection', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+                .then(r => r.json())
+                .then(data => {
+                    let html = '';
+                    for (const [service, result] of Object.entries(data)) {
+                        const ok = result.status === 'success';
+                        html += `<div class="connection-result ${ok ? 'success' : 'error'}">
+                            <i class="fas fa-${ok ? 'circle-check text-success' : 'circle-xmark text-danger'} fa-lg"></i>
+                            <div>
+                                <div style="font-weight:600;font-size:0.82rem">${service.charAt(0).toUpperCase() + service.slice(1)}</div>
+                                <div style="font-size:0.78rem;color:#64748b">${result.message}</div>
+                            </div>
+                        </div>`;
+                        if (service === 'elasticsearch') {
+                            document.getElementById('es-dot').className = `status-dot ${ok ? 'success' : 'error'}`;
+                        }
+                        if (service === 'kibana') {
+                            document.getElementById('kb-dot').className = `status-dot ${ok ? 'success' : 'error'}`;
+                        }
+                    }
+                    statusDiv.innerHTML = html;
+                })
+                .catch(() => {
+                    statusDiv.innerHTML = '<div class="alert alert-danger mb-0 py-2 small">Error testing connections</div>';
+                });
         }
     </script>
 </body>

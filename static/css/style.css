@@ -601,6 +601,7 @@ body {
   height: 8px;
   border-radius: 50%;
   display: inline-block;
+  background: #cbd5e1;
   margin-right: 0.375rem;
   flex-shrink: 0;
 }

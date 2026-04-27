@@ -514,9 +514,7 @@ def create_kibana_objects_for_data_type(data_type, index_name, config):
                 "type": "index-pattern", 
                 "id": index_name
             }],
-            "namespaces": ["default"],
-            "coreMigrationVersion": "8.0.0",
-            "typeMigrationVersion": "8.0.0"
+            "namespaces": ["default"]
         }]
         
         # Use the improved import function
@@ -526,30 +524,21 @@ def create_kibana_objects_for_data_type(data_type, index_name, config):
         print(f"Error creating Kibana objects: {str(e)}")
 
 def import_kibana_objects_improved(objects, config):
-    """Improved Kibana objects import with better error handling"""
-    # Create temporary NDJSON file
+    """Import Kibana saved objects via the bulk import API."""
     with tempfile.NamedTemporaryFile(mode='w+', suffix='.ndjson', delete=False) as f:
         for obj in objects:
             f.write(json.dumps(obj) + '\n')
         temp_path = f.name
-    
+
     try:
         with open(temp_path, 'rb') as f:
-            files = {
-                "file": ("saved_objects.ndjson", f, "application/ndjson")
-            }
-            headers = {
-                "kbn-xsrf": "true",
-                "kbn-version": "8.0.0"
-            }
-            
             resp = requests.post(
                 f"{config['kibana']['host']}/api/saved_objects/_import?overwrite=true",
                 auth=(config['kibana']['username'], config['kibana']['password']),
-                headers=headers,
-                files=files
+                headers={"kbn-xsrf": "true"},
+                files={"file": ("saved_objects.ndjson", f, "application/ndjson")},
             )
-            
+
         if resp.status_code == 200:
             result = resp.json()
             if result.get("success", False):
@@ -558,32 +547,9 @@ def import_kibana_objects_improved(objects, config):
                 print(f"Import completed with issues: {result}")
         else:
             print(f"Kibana import error: {resp.status_code} -> {resp.text}")
-            # Retry without version header
-            print("Retrying without version header...")
-            
-            with open(temp_path, 'rb') as f:
-                files = {
-                    "file": ("saved_objects.ndjson", f, "application/ndjson")
-                }
-                headers = {"kbn-xsrf": "true"}
-                
-                resp2 = requests.post(
-                    f"{config['kibana']['host']}/api/saved_objects/_import?overwrite=true",
-                    auth=(config['kibana']['username'], config['kibana']['password']),
-                    headers=headers,
-                    files=files
-                )
-                
-            if resp2.status_code == 200:
-                result = resp2.json()
-                print(f"Retry successful: imported {result.get('successCount', 0)} objects")
-            else:
-                print(f"Retry failed: {resp2.status_code} -> {resp2.text}")
-                
     except Exception as e:
         print(f"Exception during Kibana import: {str(e)}")
     finally:
-        # Clean up temp file
         try:
             os.unlink(temp_path)
         except OSError:

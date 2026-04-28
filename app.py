@@ -43,6 +43,7 @@ operation_status = {}
 operation_lock = threading.Lock()
 
 CHUNK_SIZE = 5_000  # entries per bulk-ingest / CSV-write batch
+ENABLE_CLEANUP_ROUTES = os.environ.get('ENABLE_CLEANUP_ROUTES', '1').lower() in ('1', 'true', 'yes')
 
 def _load_file_config():
     """Load config from file only, without env var overlay. Used by the save handler
@@ -117,18 +118,30 @@ def config():
     if request.method == 'POST':
         try:
             existing = _load_file_config()  # no env overlay — avoids persisting env secrets
+            env_ov = get_env_overrides()
+
+            def _form_or_file(form_key, section, key):
+                """Return the file-config value for env-controlled fields; form value otherwise."""
+                if (section, key) in env_ov:
+                    return existing[section][key]
+                return request.form.get(form_key, '').strip()
+
             es_pw = request.form.get('es_password', '').strip()
             kb_pw = request.form.get('kibana_password', '').strip()
             new_config = {
                 'elasticsearch': {
-                    'host': request.form.get('es_host', '').strip(),
-                    'username': request.form.get('es_username', '').strip(),
-                    'password': es_pw if es_pw else existing['elasticsearch']['password']
+                    'host': _form_or_file('es_host', 'elasticsearch', 'host'),
+                    'username': _form_or_file('es_username', 'elasticsearch', 'username'),
+                    'password': (existing['elasticsearch']['password']
+                                 if ('elasticsearch', 'password') in env_ov
+                                 else (es_pw if es_pw else existing['elasticsearch']['password']))
                 },
                 'kibana': {
-                    'host': request.form.get('kibana_host', '').strip(),
-                    'username': request.form.get('kibana_username', '').strip(),
-                    'password': kb_pw if kb_pw else existing['kibana']['password']
+                    'host': _form_or_file('kibana_host', 'kibana', 'host'),
+                    'username': _form_or_file('kibana_username', 'kibana', 'username'),
+                    'password': (existing['kibana']['password']
+                                 if ('kibana', 'password') in env_ov
+                                 else (kb_pw if kb_pw else existing['kibana']['password']))
                 },
                 'log_generation': {
                     'default_entries': int(request.form.get('default_entries', 1000)),
@@ -176,7 +189,6 @@ def _resolve_date_range(form):
     }
     if preset == 'custom':
         try:
-            from datetime import date as _date
             start = datetime.fromisoformat(form.get('date_from', ''))
             end   = datetime.fromisoformat(form.get('date_to', ''))
             if start >= end:
@@ -320,6 +332,7 @@ def _run_generation_pipeline(operation_id, data_type, num_entries, start_date, e
             headers={"Content-Type": "application/json"},
             json={"settings": {"number_of_shards": 1, "number_of_replicas": 0},
                   "mappings": mapping},
+            timeout=30,
         )
         if resp.status_code not in (200, 400):
             raise Exception(f"Index creation error: {resp.text[:300]}")
@@ -344,13 +357,15 @@ def _run_generation_pipeline(operation_id, data_type, num_entries, start_date, e
 
             if len(chunk) >= CHUNK_SIZE or i == num_entries - 1:
                 if generate_csv:
+                    flattened_chunk = [flatten_dict(e) for e in chunk]
                     if csv_writer is None:
-                        fieldnames = sorted(flatten_dict(chunk[0]).keys())
+                        fieldnames = sorted({k for row in flattened_chunk for k in row})
                         csv_file = open(csv_path, 'w', newline='', encoding='utf-8')
-                        csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+                        csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames,
+                                                    extrasaction='ignore')
                         csv_writer.writeheader()
-                    for entry in chunk:
-                        csv_writer.writerow(flatten_dict(entry))
+                    for row in flattened_chunk:
+                        csv_writer.writerow(row)
 
                 if ingest_to_es:
                     bulk_lines = []
@@ -362,6 +377,7 @@ def _run_generation_pipeline(operation_id, data_type, num_entries, start_date, e
                         auth=(es_user, es_pass),
                         headers={"Content-Type": "application/x-ndjson"},
                         data="\n".join(bulk_lines) + "\n",
+                        timeout=60,
                     )
                     if resp2.status_code != 200:
                         raise Exception(f"Bulk ingest HTTP error: {resp2.text[:500]}")
@@ -489,6 +505,7 @@ def ingest_data_to_es(entries, index_name, data_type, config):
         headers={"Content-Type": "application/json"},
         json={"settings": {"number_of_shards": 1, "number_of_replicas": 0},
               "mappings": mapping},
+        timeout=30,
     )
     if resp.status_code not in (200, 400):
         raise Exception(f"Index creation error: {resp.text}")
@@ -504,6 +521,7 @@ def ingest_data_to_es(entries, index_name, data_type, config):
             auth=(es_user, es_pass),
             headers={"Content-Type": "application/x-ndjson"},
             data="\n".join(bulk_lines) + "\n",
+            timeout=60,
         )
         if resp2.status_code != 200:
             raise Exception(f"Bulk ingest HTTP error: {resp2.text[:500]}")
@@ -679,8 +697,9 @@ def import_kibana_objects_improved(objects, config):
 
 @app.route('/api/cleanup/es', methods=['POST'])
 def cleanup_es():
-    """Delete all test indices from Elasticsearch.
-    Intended for local development use only — no auth guard by design."""
+    """Delete all test indices. Disabled unless ENABLE_CLEANUP_ROUTES=true."""
+    if not ENABLE_CLEANUP_ROUTES:
+        return jsonify({'error': 'Cleanup routes are disabled. Set ENABLE_CLEANUP_ROUTES=true to enable.'}), 403
     config = load_config()
     results = {}
     for data_type, meta in DATA_GENERATORS.items():
@@ -698,8 +717,9 @@ def cleanup_es():
 
 @app.route('/api/cleanup/csv', methods=['POST'])
 def cleanup_csv():
-    """Delete all CSV files from output_csv/.
-    Intended for local development use only — no auth guard by design."""
+    """Delete all CSV files from output_csv/. Disabled unless ENABLE_CLEANUP_ROUTES=true."""
+    if not ENABLE_CLEANUP_ROUTES:
+        return jsonify({'error': 'Cleanup routes are disabled. Set ENABLE_CLEANUP_ROUTES=true to enable.'}), 403
     deleted, errors = [], []
     csv_dir = 'output_csv'
     if os.path.exists(csv_dir):
@@ -716,4 +736,5 @@ if __name__ == '__main__':
     os.makedirs('templates', exist_ok=True)
     os.makedirs('static/css', exist_ok=True)
     os.makedirs('static/js', exist_ok=True)
-    app.run(debug=True, host='0.0.0.0', port=8080)
+    debug = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes')
+    app.run(debug=debug, host='0.0.0.0', port=8080)

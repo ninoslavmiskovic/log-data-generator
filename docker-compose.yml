@@ -35,6 +35,7 @@ services:
     environment:
       - ES_HOST=http://elasticsearch:9200
       - KIBANA_HOST=http://kibana:5601
+      - ENABLE_CLEANUP_ROUTES=true
     depends_on:
       elasticsearch:
         condition: service_healthy

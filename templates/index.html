@@ -271,17 +271,28 @@
             const div = document.getElementById('cleanup-result');
             div.innerHTML = '<div class="d-flex align-items-center gap-2 text-muted" style="font-size:0.82rem"><div class="spinner-border spinner-border-sm" role="status"></div> Deleting indices&hellip;</div>';
             fetch('/api/cleanup/es', { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    const rows = Object.entries(data.indices)
-                        .map(([idx, status]) => {
-                            const ok = status === 'deleted';
-                            return `<div style="font-size:0.78rem;display:flex;align-items:center;gap:6px;margin-bottom:2px;">
-                                <i class="fas fa-${ok ? 'circle-check text-success' : 'circle-xmark text-danger'}"></i>
-                                <code>${idx}</code> — ${status}
-                            </div>`;
-                        }).join('');
-                    div.innerHTML = rows;
+                .then(r => r.json().then(data => ({ ok: r.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok || data.error) {
+                        const msg = document.createElement('div');
+                        msg.className = 'text-danger small';
+                        msg.textContent = data.error || 'Server error';
+                        div.replaceChildren(msg);
+                        return;
+                    }
+                    div.replaceChildren();
+                    Object.entries(data.indices).forEach(([idx, status]) => {
+                        const isDeleted = status === 'deleted';
+                        const row = document.createElement('div');
+                        row.style.cssText = 'font-size:0.78rem;display:flex;align-items:center;gap:6px;margin-bottom:2px;';
+                        const icon = document.createElement('i');
+                        icon.className = `fas fa-${isDeleted ? 'circle-check text-success' : 'circle-xmark text-danger'}`;
+                        const code = document.createElement('code');
+                        code.textContent = idx;
+                        const text = document.createTextNode(` — ${status}`);
+                        row.append(icon, code, text);
+                        div.appendChild(row);
+                    });
                 })
                 .catch(() => { div.innerHTML = '<div class="text-danger small">Error contacting server</div>'; });
         }
@@ -291,13 +302,28 @@
             const div = document.getElementById('cleanup-result');
             div.innerHTML = '<div class="d-flex align-items-center gap-2 text-muted" style="font-size:0.82rem"><div class="spinner-border spinner-border-sm" role="status"></div> Deleting CSV files&hellip;</div>';
             fetch('/api/cleanup/csv', { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
+                .then(r => r.json().then(data => ({ ok: r.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok || data.error) {
+                        const msg = document.createElement('div');
+                        msg.className = 'text-danger small';
+                        msg.textContent = data.error || 'Server error';
+                        div.replaceChildren(msg);
+                        return;
+                    }
                     if (data.errors && data.errors.length) {
-                        div.innerHTML = `<div class="text-danger small">Errors: ${data.errors.join(', ')}</div>`;
+                        const msg = document.createElement('div');
+                        msg.className = 'text-danger small';
+                        msg.textContent = 'Errors: ' + data.errors.join(', ');
+                        div.replaceChildren(msg);
                     } else {
                         const n = data.deleted.length;
-                        div.innerHTML = `<div class="text-success small"><i class="fas fa-circle-check me-1"></i>${n} CSV file${n !== 1 ? 's' : ''} deleted.</div>`;
+                        const msg = document.createElement('div');
+                        msg.className = 'text-success small';
+                        const icon = document.createElement('i');
+                        icon.className = 'fas fa-circle-check me-1';
+                        msg.append(icon, `${n} CSV file${n !== 1 ? 's' : ''} deleted.`);
+                        div.replaceChildren(msg);
                     }
                 })
                 .catch(() => { div.innerHTML = '<div class="text-danger small">Error contacting server</div>'; });

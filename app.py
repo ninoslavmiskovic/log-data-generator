@@ -43,7 +43,7 @@ operation_status = {}
 operation_lock = threading.Lock()
 
 CHUNK_SIZE = 5_000  # entries per bulk-ingest / CSV-write batch
-ENABLE_CLEANUP_ROUTES = os.environ.get('ENABLE_CLEANUP_ROUTES', '1').lower() in ('1', 'true', 'yes')
+ENABLE_CLEANUP_ROUTES = os.environ.get('ENABLE_CLEANUP_ROUTES', '0').lower() in ('1', 'true', 'yes')
 
 def _load_file_config():
     """Load config from file only, without env var overlay. Used by the save handler
@@ -158,6 +158,27 @@ def config():
     env_overrides = get_env_overrides()
     return render_template('config.html', config=current_config, env_overrides=env_overrides)
 
+def _check_index_response(resp):
+    """Raise if the index-creation response indicates a real error.
+    A 200 means created; a 400 with resource_already_exists_exception is fine."""
+    if resp.status_code == 200:
+        return
+    if resp.status_code == 400:
+        try:
+            body = resp.json()
+            error = body.get("error", {})
+            error_type = error.get("type") if isinstance(error, dict) else None
+            if not error_type:
+                root_cause = error.get("root_cause", []) if isinstance(error, dict) else []
+                if root_cause and isinstance(root_cause[0], dict):
+                    error_type = root_cause[0].get("type")
+            if error_type in ("resource_already_exists_exception", "index_already_exists_exception"):
+                return
+        except ValueError:
+            pass
+    raise Exception(f"Index creation error: {resp.text[:300]}")
+
+
 def validate_es_connection(config):
     """Return (True, '') or (False, error_message)."""
     try:
@@ -188,14 +209,15 @@ def _resolve_date_range(form):
         'last_year': timedelta(days=365),
     }
     if preset == 'custom':
-        try:
-            start = datetime.fromisoformat(form.get('date_from', ''))
-            end   = datetime.fromisoformat(form.get('date_to', ''))
-            if start >= end:
-                raise ValueError("date_from must be before date_to")
-            return start, end
-        except (ValueError, TypeError):
-            pass  # fall back to last year
+        date_from = form.get('date_from', '').strip()
+        date_to   = form.get('date_to', '').strip()
+        if not date_from or not date_to:
+            raise ValueError("Both 'From' and 'To' dates are required for a custom range.")
+        start = datetime.fromisoformat(date_from)
+        end   = datetime.fromisoformat(date_to)
+        if start >= end:
+            raise ValueError("'From' date must be before 'To' date.")
+        return start, end
     delta = presets.get(preset, timedelta(days=365))
     return now - delta, now
 
@@ -334,8 +356,7 @@ def _run_generation_pipeline(operation_id, data_type, num_entries, start_date, e
                   "mappings": mapping},
             timeout=30,
         )
-        if resp.status_code not in (200, 400):
-            raise Exception(f"Index creation error: {resp.text[:300]}")
+        _check_index_response(resp)
 
     csv_path = None
     csv_file = csv_writer = None
@@ -507,8 +528,7 @@ def ingest_data_to_es(entries, index_name, data_type, config):
               "mappings": mapping},
         timeout=30,
     )
-    if resp.status_code not in (200, 400):
-        raise Exception(f"Index creation error: {resp.text}")
+    _check_index_response(resp)
 
     for i in range(0, len(entries), CHUNK_SIZE):
         chunk = entries[i:i + CHUNK_SIZE]

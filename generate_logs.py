@@ -239,10 +239,10 @@ SESSION_DEFS = {
         {"title": "Top Source IPs",              "desc": "Source IPs by total bytes transferred.",                                                     "query": "FROM {index}\n| stats total_bytes = SUM(`network.bytes`) by `source.ip`\n| sort total_bytes desc",                                                         "columns": ["source.ip", "total_bytes"]},
     ],
     "apm_data": [
-        {"title": "All Transactions",            "desc": "All APM transaction documents sorted by timestamp.",                                         "query": "FROM {index}\n| sort @timestamp desc",                                                                                                                             "columns": ["@timestamp", "service.name", "transaction.name", "duration.ms", "result"]},
-        {"title": "Failed Transactions",         "desc": "Transactions with result == error.",                                                          "query": "FROM {index}\n| where result == \"error\"\n| sort @timestamp desc",                                                                                           "columns": ["@timestamp", "service.name", "transaction.name", "duration.ms"]},
-        {"title": "Slow Database Queries",       "desc": "Database transactions exceeding 200 ms.",                                                    "query": "FROM {index}\n| where `transaction.type` == \"database_query\" and `duration.ms` > 200\n| sort `duration.ms` desc",                                       "columns": ["@timestamp", "service.name", "transaction.name", "duration.ms"]},
-        {"title": "Error Rate by Service",       "desc": "Count of failed transactions grouped by service.",                                           "query": "FROM {index}\n| where result == \"error\"\n| stats errors = count() by `service.name`\n| sort errors desc",                                               "columns": ["service.name", "errors"]},
+        {"title": "All Transactions",            "desc": "All APM transaction documents sorted by timestamp.",                                         "query": "FROM {index}\n| sort @timestamp desc",                                                                                                                             "columns": ["@timestamp", "service.name", "transaction.name", "transaction.duration.ms", "transaction.result"]},
+        {"title": "Failed Transactions",         "desc": "Transactions with transaction.result == error.",                                             "query": "FROM {index}\n| where `transaction.result` == \"error\"\n| sort @timestamp desc",                                                                          "columns": ["@timestamp", "service.name", "transaction.name", "transaction.duration.ms"]},
+        {"title": "Slow Database Queries",       "desc": "Database transactions exceeding 200 ms.",                                                    "query": "FROM {index}\n| where `transaction.type` == \"database_query\" and `transaction.duration.ms` > 200\n| sort `transaction.duration.ms` desc",              "columns": ["@timestamp", "service.name", "transaction.name", "transaction.duration.ms"]},
+        {"title": "Error Rate by Service",       "desc": "Count of failed transactions grouped by service.",                                           "query": "FROM {index}\n| where `transaction.result` == \"error\"\n| stats errors = count() by `service.name`\n| sort errors desc",                              "columns": ["service.name", "errors"]},
     ],
 }
 
@@ -474,7 +474,7 @@ if __name__ == "__main__":
     data_view_so = create_data_view_so_7_11()
 
     # 4) Generate Discover Sessions referencing the data view ID 'unstructured-logs'
-    discover_sos = generate_discover_sessions_for_type('unstructured_logs', 'unstructured-logs')
+    discover_sos = generate_discover_sessions_for_type('unstructured_logs', 'logs-unstructured')
 
     # 5) Write NDJSON and import via Kibana's Saved Objects API
     write_and_import_so(data_view_so, discover_sos)

@@ -362,6 +362,21 @@
                 const n = document.getElementById('num_entries').value;
                 document.getElementById('all-types-note').textContent =
                     `8 × ${parseInt(n).toLocaleString()} entries total — generates all data types.`;
+                const totalSessions = Object.values(dataTypes).reduce((s, dt) => s + dt.sessions.length, 0);
+                document.getElementById('selected-data-type-info').innerHTML = `
+                    <div class="text-center mb-3">
+                        <div class="dt-icon bg-primary-soft text-primary mx-auto mb-2"><i class="fas fa-layer-group"></i></div>
+                        <div style="font-weight:600;font-size:0.925rem;">All Data Types</div>
+                        <div class="text-muted mt-1" style="font-size:0.8rem;">Generates all 8 data types in a single sequential run.</div>
+                    </div>
+                    <div class="section-label">Included Types</div>
+                    <ul class="small mb-2">${Object.values(dataTypes).map(dt => `<li>${dt.name}</li>`).join('')}</ul>
+                    <div class="section-label">Output</div>
+                    <ul class="small mb-2">
+                        <li>8 Elasticsearch indices</li>
+                        <li>8 Kibana data views</li>
+                        <li>${totalSessions} Discover sessions</li>
+                    </ul>`;
                 updateKibanaObjectsInfoAll();
             } else {
                 allCard.style.borderColor = '#e0e7ff';

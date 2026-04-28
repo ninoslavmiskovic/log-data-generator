@@ -338,18 +338,7 @@ def generate_discover_sessions_7_11():
     for i, sdef in enumerate(session_defs, start=1):
         search_source = {
             "query": {"esql": sdef["query"]},
-            "index": {
-                "id": "unstructured-logs",
-                "title": "unstructured-logs",
-                "timeFieldName": "@timestamp",
-                "sourceFilters": [],
-                "type": "esql",
-                "fieldFormats": {},
-                "runtimeFieldMap": {},
-                "allowNoIndex": False,
-                "name": "unstructured-logs",
-                "allowHidden": False
-            },
+            "index": "unstructured-logs",  # plain string required by Kibana 8.13+
             "filter": []
         }
         so = {
@@ -485,7 +474,7 @@ if __name__ == "__main__":
     data_view_so = create_data_view_so_7_11()
 
     # 4) Generate Discover Sessions referencing the data view ID 'unstructured-logs'
-    discover_sos = generate_discover_sessions_7_11()
+    discover_sos = generate_discover_sessions_for_type('unstructured_logs', 'unstructured-logs')
 
     # 5) Write NDJSON and import via Kibana's Saved Objects API
     write_and_import_so(data_view_so, discover_sos)

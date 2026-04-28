@@ -1,7 +1,7 @@
 import json
 import os
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_session import Session
 import tempfile
@@ -42,8 +42,11 @@ DEFAULT_CONFIG = {
 operation_status = {}
 operation_lock = threading.Lock()
 
-def load_config():
-    """Load config from file then overlay environment variables (highest priority)."""
+CHUNK_SIZE = 5_000  # entries per bulk-ingest / CSV-write batch
+
+def _load_file_config():
+    """Load config from file only, without env var overlay. Used by the save handler
+    so that env-provided secrets are never accidentally persisted to config.json."""
     cfg = {s: dict(v) for s, v in DEFAULT_CONFIG.items()}
     if os.path.exists(CONFIG_FILE):
         try:
@@ -54,6 +57,11 @@ def load_config():
                     cfg[section].update(file_cfg[section])
         except (json.JSONDecodeError, OSError):
             pass
+    return cfg
+
+def load_config():
+    """Load config from file then overlay environment variables (highest priority)."""
+    cfg = _load_file_config()
     env_map = {
         ('elasticsearch', 'host'):     'ES_HOST',
         ('elasticsearch', 'username'): 'ES_USERNAME',
@@ -108,7 +116,7 @@ def config():
     """Configuration page"""
     if request.method == 'POST':
         try:
-            existing = load_config()
+            existing = _load_file_config()  # no env overlay — avoids persisting env secrets
             es_pw = request.form.get('es_password', '').strip()
             kb_pw = request.form.get('kibana_password', '').strip()
             new_config = {
@@ -160,11 +168,11 @@ def _resolve_date_range(form):
     now = datetime.now()
     preset = form.get('date_range', 'last_year')
     presets = {
-        '24h':      datetime.timedelta(hours=24),
-        '7d':       datetime.timedelta(days=7),
-        '30d':      datetime.timedelta(days=30),
-        '90d':      datetime.timedelta(days=90),
-        'last_year': datetime.timedelta(days=365),
+        '24h':      timedelta(hours=24),
+        '7d':       timedelta(days=7),
+        '30d':      timedelta(days=30),
+        '90d':      timedelta(days=90),
+        'last_year': timedelta(days=365),
     }
     if preset == 'custom':
         try:
@@ -176,7 +184,7 @@ def _resolve_date_range(form):
             return start, end
         except (ValueError, TypeError):
             pass  # fall back to last year
-    delta = presets.get(preset, datetime.timedelta(days=365))
+    delta = presets.get(preset, timedelta(days=365))
     return now - delta, now
 
 @app.route('/generate', methods=['GET', 'POST'])
@@ -292,17 +300,89 @@ def test_connection():
     
     return jsonify(results)
 
-def _generate_entries(data_type, num_entries, operation_id, start_date, end_date, progress_base=10, progress_range=20):
-    """Generate entries for one data type and return them."""
-    generator_class = DATA_GENERATORS[data_type]['generator']
-    generator = generator_class(start_date=start_date, end_date=end_date)
-    entries = []
-    for i in range(num_entries):
-        if i % 1000 == 0:
-            pct = progress_base + (i / num_entries) * progress_range
-            update_operation_status(operation_id, 'running', f'Generated {i}/{num_entries} entries...', pct)
-        entries.append(generator.generate_entry())
-    return entries
+def _run_generation_pipeline(operation_id, data_type, num_entries, start_date, end_date,
+                             generate_csv, ingest_to_es, config,
+                             progress_base=5, progress_range=75):
+    """Generate entries in CHUNK_SIZE batches, streaming to CSV and/or ES to keep memory bounded."""
+    gen_class = DATA_GENERATORS[data_type]['generator']
+    gen = gen_class(start_date=start_date, end_date=end_date)
+    index_name = DATA_GENERATORS[data_type]['index_pattern']
+
+    es_host = es_user = es_pass = None
+    if ingest_to_es:
+        es_host = config['elasticsearch']['host']
+        es_user = config['elasticsearch']['username']
+        es_pass = config['elasticsearch']['password']
+        mapping = get_mapping_for_data_type(data_type)
+        resp = requests.put(
+            f"{es_host}/{index_name}",
+            auth=(es_user, es_pass),
+            headers={"Content-Type": "application/json"},
+            json={"settings": {"number_of_shards": 1, "number_of_replicas": 0},
+                  "mappings": mapping},
+        )
+        if resp.status_code not in (200, 400):
+            raise Exception(f"Index creation error: {resp.text[:300]}")
+
+    csv_path = None
+    csv_file = csv_writer = None
+    if generate_csv:
+        os.makedirs("output_csv", exist_ok=True)
+        existing = [f for f in os.listdir("output_csv")
+                    if f.startswith(f"{data_type}-") and f.endswith(".csv")]
+        csv_path = os.path.join("output_csv", f"{data_type}-{len(existing) + 1:03d}.csv")
+
+    chunk = []
+    total_ingested = 0
+    try:
+        for i in range(num_entries):
+            if i % 1000 == 0:
+                pct = progress_base + int((i / num_entries) * progress_range)
+                update_operation_status(operation_id, 'running',
+                    f'Generated {i}/{num_entries} entries...', pct)
+            chunk.append(gen.generate_entry())
+
+            if len(chunk) >= CHUNK_SIZE or i == num_entries - 1:
+                if generate_csv:
+                    if csv_writer is None:
+                        fieldnames = sorted(flatten_dict(chunk[0]).keys())
+                        csv_file = open(csv_path, 'w', newline='', encoding='utf-8')
+                        csv_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+                        csv_writer.writeheader()
+                    for entry in chunk:
+                        csv_writer.writerow(flatten_dict(entry))
+
+                if ingest_to_es:
+                    bulk_lines = []
+                    for entry in chunk:
+                        bulk_lines.append(json.dumps({"index": {}}))
+                        bulk_lines.append(json.dumps(entry))
+                    resp2 = requests.post(
+                        f"{es_host}/{index_name}/_bulk",
+                        auth=(es_user, es_pass),
+                        headers={"Content-Type": "application/x-ndjson"},
+                        data="\n".join(bulk_lines) + "\n",
+                    )
+                    if resp2.status_code != 200:
+                        raise Exception(f"Bulk ingest HTTP error: {resp2.text[:500]}")
+                    bulk_result = resp2.json()
+                    if bulk_result.get("errors"):
+                        failed_items = [item for item in bulk_result.get("items", [])
+                                        if item.get("index", {}).get("error")]
+                        sample = failed_items[0]["index"]["error"] if failed_items else {}
+                        raise Exception(
+                            f"Bulk ingest: {len(failed_items)}/{len(chunk)} docs failed. "
+                            f"Error: {sample.get('type')}: {sample.get('reason', '')[:200]}"
+                        )
+                    total_ingested += len(chunk)
+
+                chunk = []
+    finally:
+        if csv_file:
+            csv_file.close()
+
+    return csv_path, total_ingested
+
 
 def run_log_generation(operation_id, num_entries, data_type, generate_csv,
                        ingest_to_es, create_kibana_objects, config,
@@ -310,73 +390,66 @@ def run_log_generation(operation_id, num_entries, data_type, generate_csv,
     """Background task for single data-type generation."""
     try:
         update_operation_status(operation_id, 'running', 'Starting data generation...', 0)
-
         if start_date is None:
-            from datetime import timedelta
             start_date = datetime.now() - timedelta(days=365)
         if end_date is None:
             end_date = datetime.now()
 
-        update_operation_status(operation_id, 'running', f'Generating {DATA_GENERATORS[data_type]["name"]} data...', 10)
-        entries = _generate_entries(data_type, num_entries, operation_id, start_date, end_date)
-        update_operation_status(operation_id, 'running', f'Generated {len(entries)} entries', 30)
+        csv_path, total_ingested = _run_generation_pipeline(
+            operation_id, data_type, num_entries, start_date, end_date,
+            generate_csv, ingest_to_es, config,
+            progress_base=5, progress_range=75,
+        )
 
-        if generate_csv:
-            update_operation_status(operation_id, 'running', 'Writing CSV file...', 35)
-            csv_path = write_csv_file(entries, data_type)
-            update_operation_status(operation_id, 'running', f'CSV written to {csv_path}', 45)
-
+        msg_parts = []
+        if generate_csv and csv_path:
+            msg_parts.append(f'CSV: {csv_path}')
         if ingest_to_es:
-            update_operation_status(operation_id, 'running', 'Ingesting data to Elasticsearch...', 50)
-            index_name = DATA_GENERATORS[data_type]['index_pattern']
-            ingest_data_to_es(entries, index_name, data_type, config)
-            update_operation_status(operation_id, 'running', 'Data ingested successfully', 70)
+            msg_parts.append(f'Ingested {total_ingested} docs')
 
         if create_kibana_objects:
-            update_operation_status(operation_id, 'running', 'Creating Kibana objects...', 80)
+            update_operation_status(operation_id, 'running', 'Creating Kibana objects...', 85)
             index_name = DATA_GENERATORS[data_type]['index_pattern']
             try:
                 create_kibana_objects_for_data_type(data_type, index_name, config)
-                update_operation_status(operation_id, 'running', 'Kibana objects created', 95)
+                msg_parts.append('Kibana objects created')
             except Exception as e:
-                print(f"Kibana objects creation failed (non-critical): {e}")
-                update_operation_status(operation_id, 'running',
-                    f'Kibana objects failed ({e}). Data is in index: {index_name}', 95)
+                msg_parts.append(f'Kibana objects failed: {e}')
 
-        update_operation_status(operation_id, 'completed', 'All operations completed successfully!', 100)
+        update_operation_status(operation_id, 'completed',
+            ' | '.join(msg_parts) if msg_parts else 'Done', 100)
 
     except Exception as e:
         update_operation_status(operation_id, 'error', f'Error: {str(e)}', None)
+
 
 def run_all_generation(operation_id, num_entries, generate_csv, ingest_to_es,
                        create_kibana_objects, config, start_date=None, end_date=None):
     """Background task: generate all 8 data types sequentially."""
     if start_date is None:
-        from datetime import timedelta
         start_date = datetime.now() - timedelta(days=365)
     if end_date is None:
         end_date = datetime.now()
 
     types = list(DATA_GENERATORS.keys())
     failed = []
-
-    update_operation_status(operation_id, 'running', f'Starting generation for all {len(types)} data types...', 0)
+    update_operation_status(operation_id, 'running',
+        f'Starting generation for all {len(types)} data types...', 0)
 
     for idx, data_type in enumerate(types):
-        base_pct = int((idx / len(types)) * 100)
+        base_pct = int((idx / len(types)) * 90)
         name = DATA_GENERATORS[data_type]['name']
         update_operation_status(operation_id, 'running',
             f'[{idx + 1}/{len(types)}] Generating {name}...', base_pct)
         try:
-            entries = _generate_entries(data_type, num_entries, operation_id,
-                                        start_date, end_date,
-                                        progress_base=base_pct, progress_range=4)
-            if generate_csv:
-                write_csv_file(entries, data_type)
-            if ingest_to_es:
-                ingest_data_to_es(entries, DATA_GENERATORS[data_type]['index_pattern'], data_type, config)
+            _run_generation_pipeline(
+                operation_id, data_type, num_entries, start_date, end_date,
+                generate_csv, ingest_to_es, config,
+                progress_base=base_pct, progress_range=int(90 / len(types)),
+            )
             if create_kibana_objects:
-                create_kibana_objects_for_data_type(data_type, DATA_GENERATORS[data_type]['index_pattern'], config)
+                create_kibana_objects_for_data_type(
+                    data_type, DATA_GENERATORS[data_type]['index_pattern'], config)
         except Exception as e:
             failed.append(f"{name}: {e}")
             print(f"run_all_generation: {data_type} failed: {e}")
@@ -387,34 +460,6 @@ def run_all_generation(operation_id, num_entries, generate_csv, ingest_to_es,
     else:
         update_operation_status(operation_id, 'completed',
             f'All {len(types)} data types generated successfully!', 100)
-
-def write_csv_file(entries, data_type):
-    """Write entries to CSV file"""
-    os.makedirs("output_csv", exist_ok=True)
-    
-    # Get existing CSV files to determine next number
-    existing_files = [f for f in os.listdir("output_csv") if f.startswith(f"{data_type}-") and f.endswith(".csv")]
-    next_num = len(existing_files) + 1
-    
-    csv_filename = f"{data_type}-{next_num:03d}.csv"
-    csv_path = os.path.join("output_csv", csv_filename)
-    
-    if entries:
-        # Get all possible fieldnames from all entries
-        fieldnames = set()
-        for entry in entries:
-            fieldnames.update(flatten_dict(entry).keys())
-        
-        fieldnames = sorted(list(fieldnames))
-        
-        with open(csv_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            for entry in entries:
-                flattened = flatten_dict(entry)
-                writer.writerow(flattened)
-    
-    return csv_path
 
 def flatten_dict(d, parent_key='', sep='.'):
     """Flatten nested dictionaries for CSV output"""
@@ -431,58 +476,46 @@ def flatten_dict(d, parent_key='', sep='.'):
     return dict(items)
 
 def ingest_data_to_es(entries, index_name, data_type, config):
-    """Ingest data entries into Elasticsearch"""
+    """Ingest data entries into Elasticsearch in CHUNK_SIZE batches."""
     es_host = config['elasticsearch']['host']
     es_user = config['elasticsearch']['username']
     es_pass = config['elasticsearch']['password']
-    
     index_url = f"{es_host}/{index_name}"
-    
-    # Create index with appropriate mapping
+
     mapping = get_mapping_for_data_type(data_type)
     resp = requests.put(
         index_url,
         auth=(es_user, es_pass),
         headers={"Content-Type": "application/json"},
-        json={
-            "settings": {
-                "number_of_shards": 1,
-                "number_of_replicas": 0
-            },
-            "mappings": mapping
-        }
+        json={"settings": {"number_of_shards": 1, "number_of_replicas": 0},
+              "mappings": mapping},
     )
-    
     if resp.status_code not in (200, 400):
         raise Exception(f"Index creation error: {resp.text}")
-    
-    # Bulk ingest data
-    bulk_data = []
-    for entry in entries:
-        bulk_data.append(json.dumps({"index": {}}))
-        bulk_data.append(json.dumps(entry))
-    
-    bulk_body = "\n".join(bulk_data) + "\n"
-    
-    resp2 = requests.post(
-        f"{index_url}/_bulk",
-        auth=(es_user, es_pass),
-        headers={"Content-Type": "application/x-ndjson"},
-        data=bulk_body
-    )
-    
-    if resp2.status_code != 200:
-        raise Exception(f"Bulk ingest HTTP error: {resp2.text[:500]}")
 
-    bulk_result = resp2.json()
-    if bulk_result.get("errors"):
-        failed_items = [item for item in bulk_result.get("items", [])
-                        if item.get("index", {}).get("error")]
-        sample = failed_items[0]["index"]["error"] if failed_items else {}
-        raise Exception(
-            f"Bulk ingest: {len(failed_items)}/{len(entries)} documents failed. "
-            f"Error: {sample.get('type')}: {sample.get('reason', '')[:200]}"
+    for i in range(0, len(entries), CHUNK_SIZE):
+        chunk = entries[i:i + CHUNK_SIZE]
+        bulk_lines = []
+        for entry in chunk:
+            bulk_lines.append(json.dumps({"index": {}}))
+            bulk_lines.append(json.dumps(entry))
+        resp2 = requests.post(
+            f"{index_url}/_bulk",
+            auth=(es_user, es_pass),
+            headers={"Content-Type": "application/x-ndjson"},
+            data="\n".join(bulk_lines) + "\n",
         )
+        if resp2.status_code != 200:
+            raise Exception(f"Bulk ingest HTTP error: {resp2.text[:500]}")
+        bulk_result = resp2.json()
+        if bulk_result.get("errors"):
+            failed_items = [item for item in bulk_result.get("items", [])
+                            if item.get("index", {}).get("error")]
+            sample = failed_items[0]["index"]["error"] if failed_items else {}
+            raise Exception(
+                f"Bulk ingest: {len(failed_items)}/{len(chunk)} documents failed. "
+                f"Error: {sample.get('type')}: {sample.get('reason', '')[:200]}"
+            )
 
 def get_mapping_for_data_type(data_type):
     """Get appropriate Elasticsearch mapping for data type"""
@@ -646,7 +679,8 @@ def import_kibana_objects_improved(objects, config):
 
 @app.route('/api/cleanup/es', methods=['POST'])
 def cleanup_es():
-    """Delete all test indices from Elasticsearch."""
+    """Delete all test indices from Elasticsearch.
+    Intended for local development use only — no auth guard by design."""
     config = load_config()
     results = {}
     for data_type, meta in DATA_GENERATORS.items():
@@ -664,7 +698,8 @@ def cleanup_es():
 
 @app.route('/api/cleanup/csv', methods=['POST'])
 def cleanup_csv():
-    """Delete all CSV files from output_csv/."""
+    """Delete all CSV files from output_csv/.
+    Intended for local development use only — no auth guard by design."""
     deleted, errors = [], []
     csv_dir = 'output_csv'
     if os.path.exists(csv_dir):

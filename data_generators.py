@@ -21,11 +21,11 @@ class UnstructuredLogsGenerator(DataTypeGenerator):
 
     def __init__(self, start_date=None, end_date=None):
         super().__init__(start_date=start_date, end_date=end_date)
-        span_days = max(1, (self.end_date - self.start_date).days)
-        n_spikes = min(12, span_days)
-        step = span_days // n_spikes
+        total_secs = max(1, int((self.end_date - self.start_date).total_seconds()))
+        n_spikes = min(12, max(1, total_secs // 3600))
         self.error_spike_dates = [
-            self.start_date + datetime.timedelta(days=step * i) for i in range(1, n_spikes + 1)
+            self.start_date + datetime.timedelta(seconds=int(total_secs * i / (n_spikes + 1)))
+            for i in range(1, n_spikes + 1)
         ]
         self.log_levels = ["INFO", "WARN", "ERROR", "DEBUG"]
         self.sources = ["AuthService", "PaymentService", "DatabaseService", "NotificationService", "CacheService"]

@@ -28,7 +28,7 @@ services:
       timeout: 10s
       retries: 20
 
-  app:
+  log-data-generator:
     build: .
     ports:
       - "8080:8080"

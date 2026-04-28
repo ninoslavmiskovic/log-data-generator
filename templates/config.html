@@ -80,16 +80,18 @@
                                                    {% if ('elasticsearch','username') in env_overrides %}readonly{% endif %}>
                                         </div>
                                         <div class="col-md-3">
-                                            <label for="es_password" class="form-label">Password</label>
+                                            <label for="es_password" class="form-label">Password{% if ('elasticsearch','password') in env_overrides %} <span class="badge bg-secondary" style="font-size:0.65rem;vertical-align:middle;">env var</span>{% endif %}</label>
                                             <div class="input-group">
                                                 <input type="password" class="form-control" id="es_password" name="es_password"
-                                                       placeholder="Leave blank to keep current password">
+                                                       placeholder="{% if ('elasticsearch','password') in env_overrides %}Set by environment variable{% else %}Leave blank to keep current password{% endif %}"
+                                                       {% if ('elasticsearch','password') in env_overrides %}readonly{% endif %}>
                                                 <button class="btn btn-outline-secondary" type="button"
-                                                        onclick="togglePw('es_password', this)" title="Toggle visibility">
+                                                        onclick="togglePw('es_password', this)" title="Toggle visibility"
+                                                        {% if ('elasticsearch','password') in env_overrides %}disabled{% endif %}>
                                                     <i class="fas fa-eye"></i>
                                                 </button>
                                             </div>
-                                            <div class="form-text">Leave blank to keep the existing password.</div>
+                                            <div class="form-text">{% if ('elasticsearch','password') in env_overrides %}Controlled by ES_PASSWORD env var.{% else %}Leave blank to keep the existing password.{% endif %}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -121,16 +123,18 @@
                                                    {% if ('kibana','username') in env_overrides %}readonly{% endif %}>
                                         </div>
                                         <div class="col-md-3">
-                                            <label for="kibana_password" class="form-label">Password</label>
+                                            <label for="kibana_password" class="form-label">Password{% if ('kibana','password') in env_overrides %} <span class="badge bg-secondary" style="font-size:0.65rem;vertical-align:middle;">env var</span>{% endif %}</label>
                                             <div class="input-group">
                                                 <input type="password" class="form-control" id="kibana_password" name="kibana_password"
-                                                       placeholder="Leave blank to keep current password">
+                                                       placeholder="{% if ('kibana','password') in env_overrides %}Set by environment variable{% else %}Leave blank to keep current password{% endif %}"
+                                                       {% if ('kibana','password') in env_overrides %}readonly{% endif %}>
                                                 <button class="btn btn-outline-secondary" type="button"
-                                                        onclick="togglePw('kibana_password', this)" title="Toggle visibility">
+                                                        onclick="togglePw('kibana_password', this)" title="Toggle visibility"
+                                                        {% if ('kibana','password') in env_overrides %}disabled{% endif %}>
                                                     <i class="fas fa-eye"></i>
                                                 </button>
                                             </div>
-                                            <div class="form-text">Leave blank to keep the existing password.</div>
+                                            <div class="form-text">{% if ('kibana','password') in env_overrides %}Controlled by KIBANA_PASSWORD env var.{% else %}Leave blank to keep the existing password.{% endif %}</div>
                                         </div>
                                     </div>
                                 </div>

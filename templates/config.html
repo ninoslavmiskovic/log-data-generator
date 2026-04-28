@@ -65,17 +65,19 @@
                                 <div class="config-section-body">
                                     <div class="row g-3">
                                         <div class="col-md-6">
-                                            <label for="es_host" class="form-label">Host URL</label>
+                                            <label for="es_host" class="form-label">Host URL{% if ('elasticsearch','host') in env_overrides %} <span class="badge bg-secondary" style="font-size:0.65rem;vertical-align:middle;">env var</span>{% endif %}</label>
                                             <input type="url" class="form-control" id="es_host" name="es_host"
                                                    value="{{ config.elasticsearch.host }}"
-                                                   placeholder="http://localhost:9200" required>
+                                                   placeholder="http://localhost:9200" required
+                                                   {% if ('elasticsearch','host') in env_overrides %}readonly{% endif %}>
                                             <div class="form-text">Full URL including protocol and port</div>
                                         </div>
                                         <div class="col-md-3">
-                                            <label for="es_username" class="form-label">Username</label>
+                                            <label for="es_username" class="form-label">Username{% if ('elasticsearch','username') in env_overrides %} <span class="badge bg-secondary" style="font-size:0.65rem;vertical-align:middle;">env var</span>{% endif %}</label>
                                             <input type="text" class="form-control" id="es_username" name="es_username"
                                                    value="{{ config.elasticsearch.username }}"
-                                                   placeholder="elastic" required>
+                                                   placeholder="elastic" required
+                                                   {% if ('elasticsearch','username') in env_overrides %}readonly{% endif %}>
                                         </div>
                                         <div class="col-md-3">
                                             <label for="es_password" class="form-label">Password</label>
@@ -104,17 +106,19 @@
                                 <div class="config-section-body">
                                     <div class="row g-3">
                                         <div class="col-md-6">
-                                            <label for="kibana_host" class="form-label">Host URL</label>
+                                            <label for="kibana_host" class="form-label">Host URL{% if ('kibana','host') in env_overrides %} <span class="badge bg-secondary" style="font-size:0.65rem;vertical-align:middle;">env var</span>{% endif %}</label>
                                             <input type="url" class="form-control" id="kibana_host" name="kibana_host"
                                                    value="{{ config.kibana.host }}"
-                                                   placeholder="http://localhost:5601" required>
+                                                   placeholder="http://localhost:5601" required
+                                                   {% if ('kibana','host') in env_overrides %}readonly{% endif %}>
                                             <div class="form-text">Full URL including protocol and port</div>
                                         </div>
                                         <div class="col-md-3">
-                                            <label for="kibana_username" class="form-label">Username</label>
+                                            <label for="kibana_username" class="form-label">Username{% if ('kibana','username') in env_overrides %} <span class="badge bg-secondary" style="font-size:0.65rem;vertical-align:middle;">env var</span>{% endif %}</label>
                                             <input type="text" class="form-control" id="kibana_username" name="kibana_username"
                                                    value="{{ config.kibana.username }}"
-                                                   placeholder="elastic" required>
+                                                   placeholder="elastic" required
+                                                   {% if ('kibana','username') in env_overrides %}readonly{% endif %}>
                                         </div>
                                         <div class="col-md-3">
                                             <label for="kibana_password" class="form-label">Password</label>

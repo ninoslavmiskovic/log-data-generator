@@ -9,7 +9,7 @@ import threading
 import uuid
 import requests
 # Import the log generation functions and data generators
-from generate_logs import create_data_view_so_7_11
+from generate_logs import create_data_view_so_7_11, generate_discover_sessions_for_type
 from data_generators import DATA_GENERATORS
 
 app = Flask(__name__)
@@ -43,14 +43,42 @@ operation_status = {}
 operation_lock = threading.Lock()
 
 def load_config():
-    """Load configuration from file or create default"""
+    """Load config from file then overlay environment variables (highest priority)."""
+    cfg = {s: dict(v) for s, v in DEFAULT_CONFIG.items()}
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, 'r') as f:
-                return json.load(f)
+                file_cfg = json.load(f)
+            for section in ('elasticsearch', 'kibana', 'log_generation'):
+                if section in file_cfg:
+                    cfg[section].update(file_cfg[section])
         except (json.JSONDecodeError, OSError):
-            return DEFAULT_CONFIG.copy()
-    return DEFAULT_CONFIG.copy()
+            pass
+    env_map = {
+        ('elasticsearch', 'host'):     'ES_HOST',
+        ('elasticsearch', 'username'): 'ES_USERNAME',
+        ('elasticsearch', 'password'): 'ES_PASSWORD',
+        ('kibana',        'host'):     'KIBANA_HOST',
+        ('kibana',        'username'): 'KIBANA_USERNAME',
+        ('kibana',        'password'): 'KIBANA_PASSWORD',
+    }
+    for (section, key), env_var in env_map.items():
+        val = os.environ.get(env_var)
+        if val:
+            cfg[section][key] = val
+    return cfg
+
+def get_env_overrides():
+    """Return set of (section, key) pairs currently controlled by env vars."""
+    env_map = {
+        ('elasticsearch', 'host'):     'ES_HOST',
+        ('elasticsearch', 'username'): 'ES_USERNAME',
+        ('elasticsearch', 'password'): 'ES_PASSWORD',
+        ('kibana',        'host'):     'KIBANA_HOST',
+        ('kibana',        'username'): 'KIBANA_USERNAME',
+        ('kibana',        'password'): 'KIBANA_PASSWORD',
+    }
+    return {k for k, env_var in env_map.items() if os.environ.get(env_var)}
 
 def save_config(config):
     """Save configuration to file"""
@@ -106,13 +134,56 @@ def config():
             flash(f'Error saving configuration: {str(e)}', 'error')
     
     current_config = load_config()
-    return render_template('config.html', config=current_config)
+    env_overrides = get_env_overrides()
+    return render_template('config.html', config=current_config, env_overrides=env_overrides)
+
+def validate_es_connection(config):
+    """Return (True, '') or (False, error_message)."""
+    try:
+        resp = requests.get(
+            f"{config['elasticsearch']['host']}/_cluster/health",
+            auth=(config['elasticsearch']['username'], config['elasticsearch']['password']),
+            timeout=5
+        )
+        if resp.status_code == 200:
+            return True, ''
+        return False, f"Elasticsearch returned HTTP {resp.status_code}"
+    except requests.exceptions.ConnectionError:
+        return False, f"Cannot connect to {config['elasticsearch']['host']}"
+    except requests.exceptions.Timeout:
+        return False, "Connection timed out after 5 seconds"
+    except Exception as e:
+        return False, str(e)
+
+def _resolve_date_range(form):
+    """Parse date_range form fields into (start_date, end_date) datetimes."""
+    now = datetime.now()
+    preset = form.get('date_range', 'last_year')
+    presets = {
+        '24h':      datetime.timedelta(hours=24),
+        '7d':       datetime.timedelta(days=7),
+        '30d':      datetime.timedelta(days=30),
+        '90d':      datetime.timedelta(days=90),
+        'last_year': datetime.timedelta(days=365),
+    }
+    if preset == 'custom':
+        try:
+            from datetime import date as _date
+            start = datetime.fromisoformat(form.get('date_from', ''))
+            end   = datetime.fromisoformat(form.get('date_to', ''))
+            if start >= end:
+                raise ValueError("date_from must be before date_to")
+            return start, end
+        except (ValueError, TypeError):
+            pass  # fall back to last year
+    delta = presets.get(preset, datetime.timedelta(days=365))
+    return now - delta, now
 
 @app.route('/generate', methods=['GET', 'POST'])
 def generate():
     """Log generation page"""
     config = load_config()
-    
+
     if request.method == 'POST':
         try:
             try:
@@ -120,6 +191,7 @@ def generate():
             except (ValueError, TypeError):
                 flash('Number of entries must be a valid integer', 'error')
                 return render_template('generate.html', config=config, data_generators=DATA_GENERATORS)
+
             data_type = request.form.get('data_type', 'unstructured_logs')
             generate_csv = request.form.get('generate_csv') == 'on'
             ingest_to_es = request.form.get('ingest_to_es') == 'on'
@@ -132,24 +204,38 @@ def generate():
             if num_entries > config['log_generation']['max_entries']:
                 flash(f'Number of entries cannot exceed {config["log_generation"]["max_entries"]}', 'error')
                 return render_template('generate.html', config=config, data_generators=DATA_GENERATORS)
-            
-            if data_type not in DATA_GENERATORS:
+
+            if data_type != 'all' and data_type not in DATA_GENERATORS:
                 flash('Invalid data type selected', 'error')
                 return render_template('generate.html', config=config, data_generators=DATA_GENERATORS)
-            
-            # Start background task
+
+            if ingest_to_es or create_kibana_objects:
+                ok, err = validate_es_connection(config)
+                if not ok:
+                    flash(f'Cannot reach Elasticsearch: {err}. Check Settings before generating.', 'error')
+                    return render_template('generate.html', config=config, data_generators=DATA_GENERATORS)
+
+            start_date, end_date = _resolve_date_range(request.form)
             operation_id = str(uuid.uuid4())
-            thread = threading.Thread(target=run_log_generation, args=(
-                operation_id, num_entries, data_type, generate_csv, ingest_to_es, create_kibana_objects, config
-            ))
+
+            if data_type == 'all':
+                thread = threading.Thread(target=run_all_generation, args=(
+                    operation_id, num_entries, generate_csv, ingest_to_es,
+                    create_kibana_objects, config, start_date, end_date
+                ))
+            else:
+                thread = threading.Thread(target=run_log_generation, args=(
+                    operation_id, num_entries, data_type, generate_csv,
+                    ingest_to_es, create_kibana_objects, config, start_date, end_date
+                ))
             thread.start()
-            
+
             session['current_operation'] = operation_id
             return redirect(url_for('progress', operation_id=operation_id))
-            
+
         except Exception as e:
             flash(f'Error starting log generation: {str(e)}', 'error')
-    
+
     return render_template('generate.html', config=config, data_generators=DATA_GENERATORS)
 
 @app.route('/progress/<operation_id>')
@@ -206,76 +292,101 @@ def test_connection():
     
     return jsonify(results)
 
-def run_log_generation(operation_id, num_entries, data_type, generate_csv, ingest_to_es, create_kibana_objects, config):
-    """Background task for log generation"""
+def _generate_entries(data_type, num_entries, operation_id, start_date, end_date, progress_base=10, progress_range=20):
+    """Generate entries for one data type and return them."""
+    generator_class = DATA_GENERATORS[data_type]['generator']
+    generator = generator_class(start_date=start_date, end_date=end_date)
+    entries = []
+    for i in range(num_entries):
+        if i % 1000 == 0:
+            pct = progress_base + (i / num_entries) * progress_range
+            update_operation_status(operation_id, 'running', f'Generated {i}/{num_entries} entries...', pct)
+        entries.append(generator.generate_entry())
+    return entries
+
+def run_log_generation(operation_id, num_entries, data_type, generate_csv,
+                       ingest_to_es, create_kibana_objects, config,
+                       start_date=None, end_date=None):
+    """Background task for single data-type generation."""
     try:
         update_operation_status(operation_id, 'running', 'Starting data generation...', 0)
-        
-        # Set global configuration for the generate_logs module
-        import generate_logs
-        generate_logs.ELASTICSEARCH_HOST = config['elasticsearch']['host']
-        generate_logs.ELASTICSEARCH_USER = config['elasticsearch']['username']
-        generate_logs.ELASTICSEARCH_PASS = config['elasticsearch']['password']
-        generate_logs.KIBANA_HOST = config['kibana']['host']
-        generate_logs.KIBANA_USER = config['kibana']['username']
-        generate_logs.KIBANA_PASS = config['kibana']['password']
-        
-        # Step 1: Generate data
+
+        if start_date is None:
+            from datetime import timedelta
+            start_date = datetime.now() - timedelta(days=365)
+        if end_date is None:
+            end_date = datetime.now()
+
         update_operation_status(operation_id, 'running', f'Generating {DATA_GENERATORS[data_type]["name"]} data...', 10)
-        
-        # Initialize the appropriate generator
-        generator_class = DATA_GENERATORS[data_type]['generator']
-        generator = generator_class()
-        
-        # Generate data entries
-        entries = []
-        for i in range(num_entries):
-            if i % 1000 == 0:  # Update progress every 1000 entries
-                progress = 10 + (i / num_entries) * 20  # 10-30% for generation
-                update_operation_status(operation_id, 'running', f'Generated {i}/{num_entries} entries...', progress)
-            
-            entry = generator.generate_entry()
-            entries.append(entry)
-        
-        update_operation_status(operation_id, 'running', f'Generated {len(entries)} {DATA_GENERATORS[data_type]["name"]} entries', 30)
-        
-        # Step 2: Write CSV file (if requested)
+        entries = _generate_entries(data_type, num_entries, operation_id, start_date, end_date)
+        update_operation_status(operation_id, 'running', f'Generated {len(entries)} entries', 30)
+
         if generate_csv:
             update_operation_status(operation_id, 'running', 'Writing CSV file...', 35)
             csv_path = write_csv_file(entries, data_type)
-            update_operation_status(operation_id, 'running', f'CSV file written to {csv_path}', 45)
-        
-        # Step 3: Ingest to Elasticsearch (if requested)
+            update_operation_status(operation_id, 'running', f'CSV written to {csv_path}', 45)
+
         if ingest_to_es:
             update_operation_status(operation_id, 'running', 'Ingesting data to Elasticsearch...', 50)
             index_name = DATA_GENERATORS[data_type]['index_pattern']
             ingest_data_to_es(entries, index_name, data_type, config)
             update_operation_status(operation_id, 'running', 'Data ingested successfully', 70)
-        
-        # Step 4: Create Kibana objects (if requested)
+
         if create_kibana_objects:
-            update_operation_status(operation_id, 'running', 'Creating Kibana saved objects...', 80)
+            update_operation_status(operation_id, 'running', 'Creating Kibana objects...', 80)
             index_name = DATA_GENERATORS[data_type]['index_pattern']
-            
-            # Try to create Kibana objects, but don't fail if it doesn't work
             try:
                 create_kibana_objects_for_data_type(data_type, index_name, config)
-                update_operation_status(operation_id, 'running', 'Kibana objects created successfully', 95)
+                update_operation_status(operation_id, 'running', 'Kibana objects created', 95)
             except Exception as e:
-                # Log the error but continue - this is not critical for data generation
-                print(f"Kibana objects creation failed (non-critical): {str(e)}")
-                update_operation_status(operation_id, 'running', 
-                    f'Data generated successfully. Kibana objects import failed - please create manually. Index: {index_name}', 95)
-        
-        # Provide helpful completion message
-        completion_message = 'All operations completed successfully!'
-        if create_kibana_objects:
-            completion_message += f' Index created: {DATA_GENERATORS[data_type]["index_pattern"]}. If data views are missing, create manually in Kibana.'
-        
-        update_operation_status(operation_id, 'completed', completion_message, 100)
-        
+                print(f"Kibana objects creation failed (non-critical): {e}")
+                update_operation_status(operation_id, 'running',
+                    f'Kibana objects failed ({e}). Data is in index: {index_name}', 95)
+
+        update_operation_status(operation_id, 'completed', 'All operations completed successfully!', 100)
+
     except Exception as e:
         update_operation_status(operation_id, 'error', f'Error: {str(e)}', None)
+
+def run_all_generation(operation_id, num_entries, generate_csv, ingest_to_es,
+                       create_kibana_objects, config, start_date=None, end_date=None):
+    """Background task: generate all 8 data types sequentially."""
+    if start_date is None:
+        from datetime import timedelta
+        start_date = datetime.now() - timedelta(days=365)
+    if end_date is None:
+        end_date = datetime.now()
+
+    types = list(DATA_GENERATORS.keys())
+    failed = []
+
+    update_operation_status(operation_id, 'running', f'Starting generation for all {len(types)} data types...', 0)
+
+    for idx, data_type in enumerate(types):
+        base_pct = int((idx / len(types)) * 100)
+        name = DATA_GENERATORS[data_type]['name']
+        update_operation_status(operation_id, 'running',
+            f'[{idx + 1}/{len(types)}] Generating {name}...', base_pct)
+        try:
+            entries = _generate_entries(data_type, num_entries, operation_id,
+                                        start_date, end_date,
+                                        progress_base=base_pct, progress_range=4)
+            if generate_csv:
+                write_csv_file(entries, data_type)
+            if ingest_to_es:
+                ingest_data_to_es(entries, DATA_GENERATORS[data_type]['index_pattern'], data_type, config)
+            if create_kibana_objects:
+                create_kibana_objects_for_data_type(data_type, DATA_GENERATORS[data_type]['index_pattern'], config)
+        except Exception as e:
+            failed.append(f"{name}: {e}")
+            print(f"run_all_generation: {data_type} failed: {e}")
+
+    if failed:
+        msg = f'Completed with errors on {len(failed)} type(s): ' + '; '.join(failed)
+        update_operation_status(operation_id, 'completed', msg, 100)
+    else:
+        update_operation_status(operation_id, 'completed',
+            f'All {len(types)} data types generated successfully!', 100)
 
 def write_csv_file(entries, data_type):
     """Write entries to CSV file"""
@@ -361,7 +472,17 @@ def ingest_data_to_es(entries, index_name, data_type, config):
     )
     
     if resp2.status_code != 200:
-        raise Exception(f"Bulk ingest error: {resp2.text}")
+        raise Exception(f"Bulk ingest HTTP error: {resp2.text[:500]}")
+
+    bulk_result = resp2.json()
+    if bulk_result.get("errors"):
+        failed_items = [item for item in bulk_result.get("items", [])
+                        if item.get("index", {}).get("error")]
+        sample = failed_items[0]["index"]["error"] if failed_items else {}
+        raise Exception(
+            f"Bulk ingest: {len(failed_items)}/{len(entries)} documents failed. "
+            f"Error: {sample.get('type')}: {sample.get('reason', '')[:200]}"
+        )
 
 def get_mapping_for_data_type(data_type):
     """Get appropriate Elasticsearch mapping for data type"""
@@ -484,44 +605,12 @@ def get_mapping_for_data_type(data_type):
     return mappings.get(data_type, {"properties": {"@timestamp": {"type": "date"}}})
 
 def create_kibana_objects_for_data_type(data_type, index_name, config):
-    """Create Kibana saved objects for the specified data type"""
-    try:
-        # Create data view
-        data_view_so = create_data_view_so_7_11()
-        data_view_so['attributes']['title'] = index_name
-        data_view_so['id'] = index_name
-        
-        # Create basic discover session
-        discover_sos = [{
-            "id": f"{data_type}_basic_view",
-            "type": "search", 
-            "attributes": {
-                "title": f"{DATA_GENERATORS[data_type]['name']} - Basic View",
-                "description": f"Basic view of {DATA_GENERATORS[data_type]['name']} data",
-                "hits": 0,
-                "columns": ["@timestamp"],
-                "sort": [],
-                "kibanaSavedObjectMeta": {
-                    "searchSourceJSON": json.dumps({
-                        "query": {"query": "", "language": "kuery"},
-                        "filter": [],
-                        "index": index_name
-                    })
-                }
-            },
-            "references": [{
-                "name": "kibanaSavedObjectMeta.searchSourceJSON.index",
-                "type": "index-pattern", 
-                "id": index_name
-            }],
-            "namespaces": ["default"]
-        }]
-        
-        # Use the improved import function
-        import_kibana_objects_improved([data_view_so] + discover_sos, config)
-        
-    except Exception as e:
-        print(f"Error creating Kibana objects: {str(e)}")
+    """Create Kibana data view + Discover sessions for the given data type."""
+    data_view_so = create_data_view_so_7_11()
+    data_view_so['attributes']['title'] = index_name
+    data_view_so['id'] = index_name
+    discover_sos = generate_discover_sessions_for_type(data_type, index_name)
+    import_kibana_objects_improved([data_view_so] + discover_sos, config)
 
 def import_kibana_objects_improved(objects, config):
     """Import Kibana saved objects via the bulk import API."""
@@ -555,10 +644,41 @@ def import_kibana_objects_improved(objects, config):
         except OSError:
             pass
 
+@app.route('/api/cleanup/es', methods=['POST'])
+def cleanup_es():
+    """Delete all test indices from Elasticsearch."""
+    config = load_config()
+    results = {}
+    for data_type, meta in DATA_GENERATORS.items():
+        index = meta['index_pattern']
+        try:
+            resp = requests.delete(
+                f"{config['elasticsearch']['host']}/{index}",
+                auth=(config['elasticsearch']['username'], config['elasticsearch']['password']),
+                timeout=10
+            )
+            results[index] = 'deleted' if resp.status_code in (200, 404) else f"error {resp.status_code}"
+        except Exception as e:
+            results[index] = f"error: {e}"
+    return jsonify({'status': 'done', 'indices': results})
+
+@app.route('/api/cleanup/csv', methods=['POST'])
+def cleanup_csv():
+    """Delete all CSV files from output_csv/."""
+    deleted, errors = [], []
+    csv_dir = 'output_csv'
+    if os.path.exists(csv_dir):
+        for fname in os.listdir(csv_dir):
+            if fname.endswith('.csv'):
+                try:
+                    os.remove(os.path.join(csv_dir, fname))
+                    deleted.append(fname)
+                except OSError as e:
+                    errors.append(str(e))
+    return jsonify({'deleted': deleted, 'errors': errors})
+
 if __name__ == '__main__':
-    # Create templates and static directories
     os.makedirs('templates', exist_ok=True)
     os.makedirs('static/css', exist_ok=True)
     os.makedirs('static/js', exist_ok=True)
-    
     app.run(debug=True, host='0.0.0.0', port=8080)

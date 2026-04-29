@@ -27,3 +27,17 @@ services:
       interval: 15s
       timeout: 10s
       retries: 20
+
+  log-data-generator:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - ES_HOST=http://elasticsearch:9200
+      - KIBANA_HOST=http://kibana:5601
+      - ENABLE_CLEANUP_ROUTES=true
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy

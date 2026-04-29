@@ -56,25 +56,64 @@
 
                             <!-- Data type grid -->
                             <div class="section-label">Select Data Type</div>
+
+                            <!-- All Types banner -->
+                            <div class="mb-3">
+                                <div class="data-type-card all-types-card" id="all-types-card" data-type="all" role="button" tabindex="0"
+                                     style="border-radius:10px;border:2px solid #e0e7ff;padding:12px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all 0.15s;">
+                                    <div class="dt-icon bg-primary-soft text-primary" style="flex-shrink:0;">
+                                        <i class="fas fa-layer-group"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div style="font-weight:700;font-size:0.9rem;color:#1e1b4b;">All Data Types</div>
+                                        <div class="text-muted" style="font-size:0.78rem;" id="all-types-note">Generate all 8 types in a single run — ideal for a fresh deployment.</div>
+                                    </div>
+                                    <input type="radio" name="data_type" value="all" style="display:none" id="radio-all">
+                                </div>
+                            </div>
+
                             <div class="row g-2 mb-4" id="data-type-grid"></div>
 
                             <!-- Parameters -->
                             <div class="section-label">Parameters</div>
                             <div class="row g-3 mb-4">
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <label for="num_entries" class="form-label">Number of Entries</label>
                                     <input type="number" class="form-control" id="num_entries" name="num_entries"
                                            value="{{ config.log_generation.default_entries }}"
                                            min="1" max="{{ config.log_generation.max_entries }}" required>
-                                    <div class="form-text">Max: {{ config.log_generation.max_entries }}</div>
+                                    <div class="form-text" id="entries-note">Max: {{ config.log_generation.max_entries }}</div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
+                                    <label for="date_range" class="form-label">Date Range</label>
+                                    <select class="form-select" id="date_range" name="date_range" onchange="toggleCustomDates()">
+                                        <option value="24h">Last 24 hours</option>
+                                        <option value="7d">Last 7 days</option>
+                                        <option value="30d">Last 30 days</option>
+                                        <option value="90d">Last 90 days</option>
+                                        <option value="last_year" selected>Last year</option>
+                                        <option value="custom">Custom range</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
                                     <label class="form-label">Output</label>
                                     <div class="form-check mt-1">
                                         <input class="form-check-input" type="checkbox" id="generate_csv" name="generate_csv" checked>
                                         <label class="form-check-label" for="generate_csv">
                                             <i class="fas fa-file-csv text-success me-1"></i>Export as CSV file
                                         </label>
+                                    </div>
+                                </div>
+                                <div class="col-12" id="custom-date-row" style="display:none;">
+                                    <div class="row g-2">
+                                        <div class="col-md-6">
+                                            <label for="date_from" class="form-label">From</label>
+                                            <input type="date" class="form-control" id="date_from" name="date_from">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="date_to" class="form-label">To</label>
+                                            <input type="date" class="form-control" id="date_to" name="date_to">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -108,7 +147,7 @@
                                                     Create Kibana Objects
                                                 </label>
                                             </div>
-                                            <div class="form-text">Create a data view and 6 pre-built Discover sessions with DISSECT &amp; GROK examples.</div>
+                                            <div class="form-text">Create a data view and pre-built Discover sessions for the selected data type.</div>
                                         </div>
                                     </div>
                                 </div>
@@ -146,24 +185,15 @@
                             <i class="fas fa-chart-bar text-success me-2"></i>Kibana Objects
                         </h5>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body" id="kibana-objects-info">
                         <p class="text-muted mb-3" style="font-size:0.82rem">When Kibana integration is enabled:</p>
-
                         <div class="section-label">Data View</div>
-                        <ul class="small mb-3">
-                            <li>Pattern: <code>unstructured-logs</code></li>
+                        <ul class="small mb-3" id="kibana-data-view-list">
+                            <li>Pattern: <code>logs-unstructured</code></li>
                             <li>Time field: <code>@timestamp</code></li>
                         </ul>
-
                         <div class="section-label">Discover Sessions</div>
-                        <ul class="small mb-0">
-                            <li>Retrieve All Logs</li>
-                            <li>Count by Level</li>
-                            <li>Count by Source</li>
-                            <li>Retrieve Error Logs</li>
-                            <li>Parse AuthService (DISSECT)</li>
-                            <li>Parse AuthService (GROK)</li>
-                        </ul>
+                        <ul class="small mb-0" id="kibana-sessions-list"></ul>
                     </div>
                 </div>
             </div>
@@ -177,81 +207,97 @@
                 name: 'Unstructured Logs', icon: 'fas fa-file-lines',
                 iconBg: 'bg-primary-soft', iconColor: 'text-primary',
                 description: 'Traditional log files with free-form text messages',
+                index: 'logs-unstructured',
                 details: {
                     'Sources': ['AuthService', 'PaymentService', 'DatabaseService', 'NotificationService', 'CacheService'],
                     'Levels': ['INFO (70%)', 'WARN (10%)', 'ERROR (10%)', 'DEBUG (10%)'],
                     'Features': ['Realistic timestamps', 'Error spikes', 'Dynamic templates']
-                }
+                },
+                sessions: ['Retrieve All Logs', 'Count Logs by Level', 'Count Logs by Source', 'Retrieve Error Logs', 'Parse AuthService (DISSECT)', 'Parse AuthService (GROK)']
             },
             'structured_logs': {
                 name: 'Structured Logs', icon: 'fas fa-code',
                 iconBg: 'bg-info-soft', iconColor: 'text-info',
                 description: 'JSON-formatted logs with consistent fields and metadata',
+                index: 'logs-structured',
                 details: {
                     'Services': ['user-api', 'order-service', 'inventory-service'],
                     'Fields': ['trace.id', 'span.id', 'user.id', 'http.status_code'],
                     'Environments': ['production', 'staging', 'development']
-                }
+                },
+                sessions: ['All Structured Logs', 'Error Rate by Service', 'Slow Requests (>500 ms)', 'Logs by Environment']
             },
             'distributed_traces': {
                 name: 'Distributed Traces', icon: 'fas fa-diagram-project',
                 iconBg: 'bg-purple-soft', iconColor: 'text-purple',
                 description: 'OpenTelemetry-style tracing with parent-child relationships',
+                index: 'traces',
                 details: {
                     'Services': ['frontend', 'user-service', 'order-service', 'payment-service'],
                     'Operations': ['authenticate', 'create_order', 'process_payment'],
                     'Formats': ['OpenTelemetry compatible', 'Parent-child spans']
-                }
+                },
+                sessions: ['All Spans', 'Error Spans', 'Slowest Spans by Service', 'Span Count per Trace']
             },
             'metrics': {
                 name: 'Metrics & Time Series', icon: 'fas fa-chart-line',
                 iconBg: 'bg-success-soft', iconColor: 'text-success',
                 description: 'Counter, gauge, histogram and summary metrics',
+                index: 'metrics',
                 details: {
                     'Types': ['Counter', 'Gauge', 'Histogram', 'Summary'],
                     'Sources': ['Frontend', 'API Gateway', 'Database'],
                     'Examples': ['response_time', 'cpu_usage_percent', 'requests_total']
-                }
+                },
+                sessions: ['All Metrics', 'Gauge Metrics', 'Counter Metrics by Service', 'P99 Latency Summary']
             },
             'security_events': {
                 name: 'Security Events', icon: 'fas fa-shield-halved',
                 iconBg: 'bg-danger-soft', iconColor: 'text-danger',
                 description: 'SIEM-style security events including threats and authentication',
+                index: 'security-events',
                 details: {
                     'Event Types': ['Authentication', 'Network', 'Malware', 'Data Access'],
                     'Severities': ['Low', 'Medium', 'High', 'Critical'],
                     'Attack Types': ['Brute Force', 'SQL Injection', 'XSS', 'DDoS']
-                }
+                },
+                sessions: ['All Security Events', 'Authentication Failures', 'Critical Severity Events', 'Malware Detections']
             },
             'alerts': {
                 name: 'Alerts & Notifications', icon: 'fas fa-bell',
                 iconBg: 'bg-warning-soft', iconColor: 'text-warning',
                 description: 'Alert manager style alerts with firing and resolved states',
+                index: 'alerts',
                 details: {
                     'Alert Types': ['HighCPUUsage', 'ServiceDown', 'HighErrorRate'],
                     'States': ['Firing', 'Resolved'],
                     'Severities': ['Warning', 'Critical']
-                }
+                },
+                sessions: ['All Alerts', 'Currently Firing Alerts', 'Alerts by Severity', 'Alert Resolution Times']
             },
             'network_traffic': {
                 name: 'Network Traffic', icon: 'fas fa-network-wired',
                 iconBg: 'bg-info-soft', iconColor: 'text-info',
                 description: 'Network flow logs with connection details and protocols',
+                index: 'network-traffic',
                 details: {
                     'Protocols': ['TCP', 'UDP', 'ICMP'],
                     'Directions': ['Inbound', 'Outbound', 'Internal'],
                     'Data': ['Bytes transferred', 'Packet counts', 'Duration']
-                }
+                },
+                sessions: ['All Network Flows', 'Blocked Connections', 'HTTP and HTTPS Traffic', 'Top Source IPs']
             },
             'apm_data': {
                 name: 'APM Data', icon: 'fas fa-gauge-high',
                 iconBg: 'bg-success-soft', iconColor: 'text-success',
                 description: 'Application Performance Monitoring with transactions and errors',
+                index: 'apm',
                 details: {
                     'Transaction Types': ['Request', 'Database Query', 'Background Job'],
                     'Services': ['Web App', 'API Service', 'Worker'],
                     'Metrics': ['Duration', 'Error rates', 'Throughput']
-                }
+                },
+                sessions: ['All Transactions', 'Failed Transactions', 'Slow Database Queries', 'Error Rate by Service']
             }
         };
 
@@ -277,7 +323,7 @@
                     </div>`;
                 grid.appendChild(col);
             }
-            document.querySelectorAll('.data-type-card').forEach(card => {
+            document.querySelectorAll('.data-type-card:not(#all-types-card)').forEach(card => {
                 card.addEventListener('click', () => selectDataType(card.dataset.type));
                 card.addEventListener('keydown', e => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -286,23 +332,68 @@
                     }
                 });
             });
+
+            const allCard = document.getElementById('all-types-card');
+            allCard.addEventListener('click', () => selectDataType('all'));
+            allCard.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectDataType('all'); }
+            });
+
             updateInfo();
         }
 
         function selectDataType(type) {
             selectedDataType = type;
-            document.querySelectorAll('.data-type-card').forEach(c => {
+
+            // Deselect all individual type cards
+            document.querySelectorAll('.data-type-card:not(#all-types-card)').forEach(c => {
                 c.classList.remove('selected');
                 c.querySelector('input').checked = false;
+                c.style.opacity = type === 'all' ? '0.45' : '1';
             });
-            const card = document.querySelector(`[data-type="${type}"]`);
-            card.classList.add('selected');
-            card.querySelector('input').checked = true;
-            updateInfo();
+
+            const allCard = document.getElementById('all-types-card');
+            const radioAll = document.getElementById('radio-all');
+
+            if (type === 'all') {
+                allCard.style.borderColor = 'var(--c-primary)';
+                allCard.style.background = '#eef2ff';
+                radioAll.checked = true;
+                const n = document.getElementById('num_entries').value;
+                document.getElementById('all-types-note').textContent =
+                    `8 × ${parseInt(n).toLocaleString()} entries total — generates all data types.`;
+                const totalSessions = Object.values(dataTypes).reduce((s, dt) => s + dt.sessions.length, 0);
+                document.getElementById('selected-data-type-info').innerHTML = `
+                    <div class="text-center mb-3">
+                        <div class="dt-icon bg-primary-soft text-primary mx-auto mb-2"><i class="fas fa-layer-group"></i></div>
+                        <div style="font-weight:600;font-size:0.925rem;">All Data Types</div>
+                        <div class="text-muted mt-1" style="font-size:0.8rem;">Generates all 8 data types in a single sequential run.</div>
+                    </div>
+                    <div class="section-label">Included Types</div>
+                    <ul class="small mb-2">${Object.values(dataTypes).map(dt => `<li>${dt.name}</li>`).join('')}</ul>
+                    <div class="section-label">Output</div>
+                    <ul class="small mb-2">
+                        <li>8 Elasticsearch indices</li>
+                        <li>8 Kibana data views</li>
+                        <li>${totalSessions} Discover sessions</li>
+                    </ul>`;
+                updateKibanaObjectsInfoAll();
+            } else {
+                allCard.style.borderColor = '#e0e7ff';
+                allCard.style.background = '';
+                radioAll.checked = false;
+                document.getElementById('all-types-note').textContent =
+                    'Generate all 8 types in a single run — ideal for a fresh deployment.';
+                document.querySelectorAll('.data-type-card:not(#all-types-card)').forEach(c => c.style.opacity = '1');
+                const card = document.querySelector(`.data-type-card[data-type="${type}"]`);
+                if (card) { card.classList.add('selected'); card.querySelector('input').checked = true; }
+                updateInfo();
+            }
         }
 
         function updateInfo() {
             const dt = dataTypes[selectedDataType];
+            if (!dt) return;
             let html = `
                 <div class="text-center mb-3">
                     <div class="dt-icon ${dt.iconBg} ${dt.iconColor} mx-auto mb-2"><i class="${dt.icon}"></i></div>
@@ -315,6 +406,27 @@
                 html += '</ul>';
             }
             document.getElementById('selected-data-type-info').innerHTML = html;
+            updateKibanaObjectsInfo(dt);
+        }
+
+        function updateKibanaObjectsInfo(dt) {
+            document.getElementById('kibana-data-view-list').innerHTML =
+                `<li>Pattern: <code>${dt.index}</code></li><li>Time field: <code>@timestamp</code></li>`;
+            const ul = document.getElementById('kibana-sessions-list');
+            ul.innerHTML = dt.sessions.map(s => `<li>${s}</li>`).join('');
+        }
+
+        function updateKibanaObjectsInfoAll() {
+            document.getElementById('kibana-data-view-list').innerHTML =
+                '<li>8 data views (one per type)</li><li>Time field: <code>@timestamp</code></li>';
+            const count = Object.values(dataTypes).reduce((sum, dt) => sum + dt.sessions.length, 0);
+            document.getElementById('kibana-sessions-list').innerHTML =
+                `<li>${count} Discover sessions total (3–6 per type)</li>`;
+        }
+
+        function toggleCustomDates() {
+            const v = document.getElementById('date_range').value;
+            document.getElementById('custom-date-row').style.display = v === 'custom' ? '' : 'none';
         }
 
         function updateKibanaObjectsState() {
@@ -325,6 +437,9 @@
         }
 
         document.getElementById('ingest_to_es').addEventListener('change', updateKibanaObjectsState);
+        document.getElementById('num_entries').addEventListener('input', () => {
+            if (selectedDataType === 'all') selectDataType('all');
+        });
 
         document.addEventListener('DOMContentLoaded', function () {
             initGrid();

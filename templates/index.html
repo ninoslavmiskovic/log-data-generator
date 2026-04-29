@@ -111,6 +111,23 @@
                     </div>
                 </div>
 
+                <!-- Reset test data -->
+                <div class="section-label">Reset Test Data</div>
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <p class="text-muted mb-3" style="font-size:0.85rem;">Delete previously generated data to start fresh for a clean deployment test.</p>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-outline-danger btn-sm" onclick="cleanupES()">
+                                <i class="fas fa-trash-can me-1"></i>Delete ES Indices
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="cleanupCSV()">
+                                <i class="fas fa-file-circle-xmark me-1"></i>Clear CSV Files
+                            </button>
+                        </div>
+                        <div id="cleanup-result" class="mt-3"></div>
+                    </div>
+                </div>
+
                 <!-- Data types showcase -->
                 <div class="section-label">Supported Data Types</div>
                 <div class="card">
@@ -247,6 +264,69 @@
                 .catch(() => {
                     statusDiv.innerHTML = '<div class="alert alert-danger mb-0 py-2 small">Error testing connections</div>';
                 });
+        }
+
+        function cleanupES() {
+            if (!confirm('Delete all 8 test indices from Elasticsearch?\n\nThis cannot be undone.')) return;
+            const div = document.getElementById('cleanup-result');
+            div.innerHTML = '<div class="d-flex align-items-center gap-2 text-muted" style="font-size:0.82rem"><div class="spinner-border spinner-border-sm" role="status"></div> Deleting indices&hellip;</div>';
+            fetch('/api/cleanup/es', { method: 'POST' })
+                .then(r => r.json().then(data => ({ ok: r.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok || data.error) {
+                        const msg = document.createElement('div');
+                        msg.className = 'text-danger small';
+                        msg.textContent = data.error || 'Server error';
+                        div.replaceChildren(msg);
+                        return;
+                    }
+                    div.replaceChildren();
+                    Object.entries(data.indices).forEach(([idx, status]) => {
+                        const isDeleted = status === 'deleted';
+                        const row = document.createElement('div');
+                        row.style.cssText = 'font-size:0.78rem;display:flex;align-items:center;gap:6px;margin-bottom:2px;';
+                        const icon = document.createElement('i');
+                        icon.className = `fas fa-${isDeleted ? 'circle-check text-success' : 'circle-xmark text-danger'}`;
+                        const code = document.createElement('code');
+                        code.textContent = idx;
+                        const text = document.createTextNode(` — ${status}`);
+                        row.append(icon, code, text);
+                        div.appendChild(row);
+                    });
+                })
+                .catch(() => { div.innerHTML = '<div class="text-danger small">Error contacting server</div>'; });
+        }
+
+        function cleanupCSV() {
+            if (!confirm('Delete all CSV files from output_csv/?\n\nThis cannot be undone.')) return;
+            const div = document.getElementById('cleanup-result');
+            div.innerHTML = '<div class="d-flex align-items-center gap-2 text-muted" style="font-size:0.82rem"><div class="spinner-border spinner-border-sm" role="status"></div> Deleting CSV files&hellip;</div>';
+            fetch('/api/cleanup/csv', { method: 'POST' })
+                .then(r => r.json().then(data => ({ ok: r.ok, data })))
+                .then(({ ok, data }) => {
+                    if (!ok || data.error) {
+                        const msg = document.createElement('div');
+                        msg.className = 'text-danger small';
+                        msg.textContent = data.error || 'Server error';
+                        div.replaceChildren(msg);
+                        return;
+                    }
+                    if (data.errors && data.errors.length) {
+                        const msg = document.createElement('div');
+                        msg.className = 'text-danger small';
+                        msg.textContent = 'Errors: ' + data.errors.join(', ');
+                        div.replaceChildren(msg);
+                    } else {
+                        const n = data.deleted.length;
+                        const msg = document.createElement('div');
+                        msg.className = 'text-success small';
+                        const icon = document.createElement('i');
+                        icon.className = 'fas fa-circle-check me-1';
+                        msg.append(icon, `${n} CSV file${n !== 1 ? 's' : ''} deleted.`);
+                        div.replaceChildren(msg);
+                    }
+                })
+                .catch(() => { div.innerHTML = '<div class="text-danger small">Error contacting server</div>'; });
         }
     </script>
 </body>

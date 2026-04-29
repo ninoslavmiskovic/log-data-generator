@@ -6,11 +6,11 @@ fake = Faker()
 
 class DataTypeGenerator:
     """Base class for all data type generators"""
-    
-    def __init__(self):
-        self.start_date = datetime.datetime.now() - datetime.timedelta(days=365)
-        self.end_date = datetime.datetime.now()
-    
+
+    def __init__(self, start_date=None, end_date=None):
+        self.end_date = end_date or datetime.datetime.now()
+        self.start_date = start_date or (self.end_date - datetime.timedelta(days=365))
+
     def random_timestamp(self, start=None, end=None):
         start = start or self.start_date
         end = end or self.end_date
@@ -18,9 +18,15 @@ class DataTypeGenerator:
 
 class UnstructuredLogsGenerator(DataTypeGenerator):
     """Original unstructured logs generator"""
-    
-    def __init__(self):
-        super().__init__()
+
+    def __init__(self, start_date=None, end_date=None):
+        super().__init__(start_date=start_date, end_date=end_date)
+        total_secs = max(1, int((self.end_date - self.start_date).total_seconds()))
+        n_spikes = min(12, max(1, total_secs // 3600))
+        self.error_spike_dates = [
+            self.start_date + datetime.timedelta(seconds=int(total_secs * i / (n_spikes + 1)))
+            for i in range(1, n_spikes + 1)
+        ]
         self.log_levels = ["INFO", "WARN", "ERROR", "DEBUG"]
         self.sources = ["AuthService", "PaymentService", "DatabaseService", "NotificationService", "CacheService"]
         self.messages = {
@@ -63,7 +69,7 @@ class UnstructuredLogsGenerator(DataTypeGenerator):
     
     def generate_entry(self):
         if random.random() < 0.10:
-            timestamp = random.choice([self.start_date + datetime.timedelta(days=30 * i) for i in range(1, 13)]) + datetime.timedelta(seconds=random.randint(0, 3600))
+            timestamp = random.choice(self.error_spike_dates) + datetime.timedelta(seconds=random.randint(0, 3600))
             level = "ERROR"
         else:
             timestamp = self.random_timestamp()
@@ -99,8 +105,8 @@ class UnstructuredLogsGenerator(DataTypeGenerator):
 class StructuredLogsGenerator(DataTypeGenerator):
     """JSON structured logs with consistent fields"""
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, start_date=None, end_date=None):
+        super().__init__(start_date=start_date, end_date=end_date)
         self.services = ["user-api", "order-service", "inventory-service", "notification-service", "analytics-service"]
         self.environments = ["production", "staging", "development"]
         self.log_levels = ["INFO", "WARN", "ERROR", "DEBUG"]
@@ -153,8 +159,8 @@ class StructuredLogsGenerator(DataTypeGenerator):
 class DistributedTracesGenerator(DataTypeGenerator):
     """OpenTelemetry-style distributed tracing data"""
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, start_date=None, end_date=None):
+        super().__init__(start_date=start_date, end_date=end_date)
         self.services = ["frontend", "user-service", "order-service", "payment-service", "inventory-service", "notification-service"]
         self.operations = {
             "frontend": ["page_load", "user_click", "form_submit", "api_call"],
@@ -175,13 +181,20 @@ class DistributedTracesGenerator(DataTypeGenerator):
             parent_span = random.choice(spans)
             service = random.choice(self.services[1:])  # Skip frontend for child spans
             operation = random.choice(self.operations[service])
-            child_span = self._generate_span(trace_id, parent_span["span.id"], service, operation)
+            child_span = self._generate_span(trace_id, parent_span["span.id"], service, operation,
+                                              parent_start=parent_span["@timestamp"])
             spans.append(child_span)
         
         return random.choice(spans)  # Return one span from the trace
     
-    def _generate_span(self, trace_id, parent_span_id, service, operation, is_root=False):
-        start_time = self.random_timestamp()
+    def _generate_span(self, trace_id, parent_span_id, service, operation, is_root=False, parent_start=None):
+        if parent_start and not is_root:
+            # Parse ISO string back to datetime so child starts after parent
+            if isinstance(parent_start, str):
+                parent_start = datetime.datetime.fromisoformat(parent_start.rstrip('Z'))
+            start_time = self.random_timestamp(start=parent_start)
+        else:
+            start_time = self.random_timestamp()
         duration_ms = fake.random_int(1, 1000) if not is_root else fake.random_int(100, 5000)
         end_time = start_time + datetime.timedelta(milliseconds=duration_ms)
         
@@ -223,8 +236,8 @@ class DistributedTracesGenerator(DataTypeGenerator):
 class MetricsGenerator(DataTypeGenerator):
     """Time series metrics data"""
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, start_date=None, end_date=None):
+        super().__init__(start_date=start_date, end_date=end_date)
         self.metric_types = ["counter", "gauge", "histogram", "summary"]
         self.services = ["frontend", "api-gateway", "user-service", "order-service", "database"]
         
@@ -325,8 +338,8 @@ class MetricsGenerator(DataTypeGenerator):
 class SecurityEventsGenerator(DataTypeGenerator):
     """SIEM-style security events"""
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, start_date=None, end_date=None):
+        super().__init__(start_date=start_date, end_date=end_date)
         self.event_types = ["authentication", "authorization", "network", "malware", "data_access", "system"]
         self.severities = ["low", "medium", "high", "critical"]
         self.attack_types = ["brute_force", "sql_injection", "xss", "csrf", "malware", "phishing", "ddos"]
@@ -406,8 +419,8 @@ class SecurityEventsGenerator(DataTypeGenerator):
 class AlertsGenerator(DataTypeGenerator):
     """Alert manager style alerts"""
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, start_date=None, end_date=None):
+        super().__init__(start_date=start_date, end_date=end_date)
         self.alert_names = [
             "HighCPUUsage", "HighMemoryUsage", "DiskSpaceLow", "ServiceDown",
             "HighErrorRate", "SlowResponseTime", "DatabaseConnectionFailed",
@@ -483,8 +496,8 @@ class AlertsGenerator(DataTypeGenerator):
 class NetworkTrafficGenerator(DataTypeGenerator):
     """Network flow and traffic data"""
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, start_date=None, end_date=None):
+        super().__init__(start_date=start_date, end_date=end_date)
         self.protocols = ["TCP", "UDP", "ICMP"]
         self.common_ports = [80, 443, 22, 21, 25, 53, 110, 143, 993, 995, 3389, 1433, 3306, 5432, 6379]
     
@@ -537,8 +550,8 @@ class NetworkTrafficGenerator(DataTypeGenerator):
 class APMDataGenerator(DataTypeGenerator):
     """Application Performance Monitoring data"""
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, start_date=None, end_date=None):
+        super().__init__(start_date=start_date, end_date=end_date)
         self.transaction_types = ["request", "task", "background_job", "database_query"]
         self.services = ["web-app", "api-service", "worker", "database"]
     

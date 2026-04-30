@@ -111,6 +111,17 @@
                     </div>
                 </div>
 
+                <!-- Streaming status -->
+                <div class="section-label">Live Stream</div>
+                <div class="card mb-4" id="stream-status-card">
+                    <div class="card-body d-flex align-items-center gap-3" style="min-height:62px;">
+                        <span class="status-dot" id="stream-dot"></span>
+                        <div id="stream-status-text" class="text-muted" style="font-size:0.85rem;">
+                            No active stream. <a href="{{ url_for('generate') }}">Start one →</a>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Reset test data -->
                 <div class="section-label">Reset Test Data</div>
                 <div class="card mb-4">
@@ -235,6 +246,33 @@
 
     <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <script>
+        // Stream status polling
+        function pollStream() {
+            fetch('/api/stream/status')
+                .then(r => r.json())
+                .then(s => {
+                    const dot = document.getElementById('stream-dot');
+                    const txt = document.getElementById('stream-status-text');
+                    if (s.active) {
+                        dot.className = 'status-dot success';
+                        const dt = (s.data_type || '').replace(/_/g, ' ');
+                        txt.innerHTML = `<strong>Streaming ${dt}</strong> &mdash; `
+                            + `${(s.total_generated || 0).toLocaleString()} events &bull; `
+                            + `${(s.actual_rate || 0).toFixed(1)}/min &bull; `
+                            + `${s.elapsed_seconds || 0}s elapsed`;
+                    } else {
+                        dot.className = 'status-dot';
+                        const last = s.total_generated;
+                        txt.innerHTML = last
+                            ? `Last stream: ${last.toLocaleString()} events. <a href="{{ url_for('generate') }}">Start another →</a>`
+                            : `No active stream. <a href="{{ url_for('generate') }}">Start one →</a>`;
+                    }
+                    setTimeout(pollStream, s.active ? 2000 : 5000);
+                })
+                .catch(() => setTimeout(pollStream, 10000));
+        }
+        pollStream();
+
         function testConnections() {
             const statusDiv = document.getElementById('connection-status');
             statusDiv.innerHTML = '<div class="d-flex align-items-center gap-2 text-muted" style="font-size:0.85rem"><div class="spinner-border spinner-border-sm" role="status"></div> Testing&hellip;</div>';

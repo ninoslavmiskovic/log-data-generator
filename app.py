@@ -11,6 +11,8 @@ import requests
 # Import the log generation functions and data generators
 from generate_logs import create_data_view_so_7_11, generate_discover_sessions_for_type
 from data_generators import DATA_GENERATORS
+import streaming as _streaming
+from scenarios import SCENARIOS, generate_scenario_entries
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
@@ -676,12 +678,17 @@ def get_mapping_for_data_type(data_type):
     return mappings.get(data_type, {"properties": {"@timestamp": {"type": "date"}}})
 
 def create_kibana_objects_for_data_type(data_type, index_name, config):
-    """Create Kibana data view + Discover sessions for the given data type."""
+    """Create Kibana data view, Discover sessions, and dashboard for the given data type."""
     data_view_so = create_data_view_so_7_11()
     data_view_so['attributes']['title'] = index_name
     data_view_so['id'] = index_name
     discover_sos = generate_discover_sessions_for_type(data_type, index_name)
     import_kibana_objects_improved([data_view_so] + discover_sos, config)
+    try:
+        from dashboards import create_kibana_dashboard
+        create_kibana_dashboard(data_type, index_name, config)
+    except Exception as e:
+        print(f"Dashboard creation skipped for {data_type}: {e}")
 
 def import_kibana_objects_improved(objects, config):
     """Import Kibana saved objects via the bulk import API."""
@@ -751,6 +758,113 @@ def cleanup_csv():
                 except OSError as e:
                     errors.append(str(e))
     return jsonify({'deleted': deleted, 'errors': errors})
+
+# ---------------------------------------------------------------------------
+# Streaming API
+# ---------------------------------------------------------------------------
+
+@app.route('/api/stream/status')
+def stream_status():
+    return jsonify(_streaming.get_status())
+
+
+@app.route('/api/stream/start', methods=['POST'])
+def stream_start():
+    data = request.get_json(force=True, silent=True) or {}
+    data_type  = data.get('data_type', 'unstructured_logs')
+    rate       = int(data.get('rate_per_min', 60))
+    max_events = int(data.get('max_events', 0))
+    config = load_config()
+
+    if data_type not in DATA_GENERATORS:
+        return jsonify({'error': f'Unknown data type: {data_type}'}), 400
+
+    ok, err = validate_es_connection(config)
+    if not ok:
+        return jsonify({'error': f'Cannot reach Elasticsearch: {err}'}), 503
+
+    ok, err = _streaming.start_streaming(data_type, rate, config, max_events)
+    if not ok:
+        return jsonify({'error': err}), 409
+    return jsonify({'status': 'started', 'data_type': data_type, 'rate_per_min': rate})
+
+
+@app.route('/api/stream/stop', methods=['POST'])
+def stream_stop():
+    ok, msg = _streaming.stop_streaming()
+    return jsonify({'status': 'stopped' if ok else 'not_active', 'message': msg})
+
+
+# ---------------------------------------------------------------------------
+# Scenarios API
+# ---------------------------------------------------------------------------
+
+@app.route('/api/scenarios')
+def list_scenarios():
+    return jsonify(SCENARIOS)
+
+
+@app.route('/api/scenario/run', methods=['POST'])
+def run_scenario():
+    data = request.get_json(force=True, silent=True) or {}
+    scenario_name  = data.get('scenario')
+    num_entries    = int(data.get('entries', 500))
+    ingest_es      = bool(data.get('ingest_to_es', False))
+    create_kibana  = bool(data.get('create_kibana_objects', False))
+    date_range     = data.get('date_range', '7d')
+    config = load_config()
+
+    if scenario_name not in SCENARIOS:
+        return jsonify({'error': f'Unknown scenario: {scenario_name}'}), 400
+
+    if ingest_es or create_kibana:
+        ok, err = validate_es_connection(config)
+        if not ok:
+            return jsonify({'error': f'Cannot reach Elasticsearch: {err}'}), 503
+
+    try:
+        start_date, end_date = _resolve_date_range({'date_range': date_range})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+    operation_id = str(uuid.uuid4())
+    thread = threading.Thread(
+        target=_run_scenario_task,
+        args=(operation_id, scenario_name, num_entries, ingest_es, create_kibana,
+              config, start_date, end_date),
+    )
+    thread.start()
+    return jsonify({'operation_id': operation_id})
+
+
+def _run_scenario_task(operation_id, scenario_name, num_entries,
+                       ingest_es, create_kibana, config, start_date, end_date):
+    try:
+        meta = SCENARIOS[scenario_name]
+        update_operation_status(operation_id, 'running',
+            f"Generating scenario '{meta['name']}'...", 0)
+
+        results = generate_scenario_entries(scenario_name, num_entries, start_date, end_date)
+        total = sum(len(v) for v in results.values())
+
+        for idx, (data_type, entries) in enumerate(results.items()):
+            pct = int((idx / len(results)) * 85)
+            update_operation_status(operation_id, 'running',
+                f"[{idx+1}/{len(results)}] Ingesting {data_type} ({len(entries)} entries)...", pct)
+
+            if ingest_es:
+                index_name = DATA_GENERATORS[data_type]['index_pattern']
+                ingest_data_to_es(entries, index_name, data_type, config)
+            if create_kibana:
+                index_name = DATA_GENERATORS[data_type]['index_pattern']
+                create_kibana_objects_for_data_type(data_type, index_name, config)
+
+        update_operation_status(operation_id, 'completed',
+            f"Scenario '{meta['name']}' complete — {total} total entries across "
+            f"{len(results)} data types.", 100)
+    except Exception as e:
+        update_operation_status(operation_id, 'error', f'Scenario error: {e}', None)
+
 
 if __name__ == '__main__':
     os.makedirs('templates', exist_ok=True)

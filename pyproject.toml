@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "log-data-generator"
+version = "1.0.0"
+description = "Generate synthetic observability data for Elasticsearch / Kibana"
+requires-python = ">=3.9"
+dependencies = [
+    "flask>=3.0",
+    "flask-session>=0.8",
+    "requests>=2.31",
+    "faker>=24.0",
+    "click>=8.1",
+]
+
+[project.scripts]
+ldg = "cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*.py"]

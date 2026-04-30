@@ -42,6 +42,119 @@
             {% endif %}
         {% endwith %}
 
+        <!-- Correlated Scenarios -->
+        <div class="mb-4 fade-in">
+            <div class="section-label">Correlated Scenarios <span class="badge bg-primary ms-1" style="font-size:0.65rem;vertical-align:middle;">NEW</span></div>
+            <div class="row g-3" id="scenario-cards">
+                <div class="col-md-4">
+                    <div class="card h-100 scenario-card" data-scenario="deployment_failure" role="button" tabindex="0"
+                         style="border:2px solid #fee2e2;cursor:pointer;transition:all 0.15s;">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center gap-3 mb-2">
+                                <div style="width:38px;height:38px;border-radius:8px;background:#fee2e2;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-bomb text-danger"></i>
+                                </div>
+                                <div style="font-weight:700;font-size:0.875rem;">Deployment Failure</div>
+                            </div>
+                            <p class="text-muted mb-3" style="font-size:0.78rem;line-height:1.5;">
+                                A bad deployment causes error spikes, CPU saturation, latency surges, and critical alerts across interconnected services.
+                            </p>
+                            <div style="font-size:0.72rem;color:#64748b;" class="mb-3">
+                                <i class="fas fa-layer-group me-1"></i>structured_logs · metrics · alerts · apm_data
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger w-100 run-scenario-btn" data-scenario="deployment_failure">
+                                <i class="fas fa-play me-1"></i>Run Scenario
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 scenario-card" data-scenario="security_incident" role="button" tabindex="0"
+                         style="border:2px solid #fee2e2;cursor:pointer;transition:all 0.15s;">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center gap-3 mb-2">
+                                <div style="width:38px;height:38px;border-radius:8px;background:#fee2e2;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-skull-crossbones text-danger"></i>
+                                </div>
+                                <div style="font-weight:700;font-size:0.875rem;">Security Incident</div>
+                            </div>
+                            <p class="text-muted mb-3" style="font-size:0.78rem;line-height:1.5;">
+                                A brute-force attack from a single IP triggers auth failures, firewall blocks, critical alerts, and correlated 401s in application logs.
+                            </p>
+                            <div style="font-size:0.72rem;color:#64748b;" class="mb-3">
+                                <i class="fas fa-layer-group me-1"></i>security_events · network_traffic · alerts · structured_logs
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger w-100 run-scenario-btn" data-scenario="security_incident">
+                                <i class="fas fa-play me-1"></i>Run Scenario
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 scenario-card" data-scenario="database_slowdown" role="button" tabindex="0"
+                         style="border:2px solid #fef3c7;cursor:pointer;transition:all 0.15s;">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center gap-3 mb-2">
+                                <div style="width:38px;height:38px;border-radius:8px;background:#fef3c7;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <i class="fas fa-database text-warning"></i>
+                                </div>
+                                <div style="font-weight:700;font-size:0.875rem;">Database Slowdown</div>
+                            </div>
+                            <p class="text-muted mb-3" style="font-size:0.78rem;line-height:1.5;">
+                                Connection pool exhaustion causes cascading slow queries visible in APM, metric gauges, application error logs, and trace durations.
+                            </p>
+                            <div style="font-size:0.72rem;color:#64748b;" class="mb-3">
+                                <i class="fas fa-layer-group me-1"></i>apm_data · metrics · structured_logs · distributed_traces
+                            </div>
+                            <button class="btn btn-sm btn-outline-warning w-100 run-scenario-btn" data-scenario="database_slowdown">
+                                <i class="fas fa-play me-1"></i>Run Scenario
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Scenario options (shown when a scenario button is clicked) -->
+            <div id="scenario-options" class="card mt-3" style="display:none;border-color:#e0e7ff;background:#fafaff;">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div>
+                            <span class="fw-semibold" id="scenario-options-title">Configure Scenario</span>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="cancelScenario()">Cancel</button>
+                    </div>
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label" style="font-size:0.82rem;">Entries per type</label>
+                            <input type="number" class="form-control form-control-sm" id="scenario-entries" value="500" min="10" max="10000">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" style="font-size:0.82rem;">Time window</label>
+                            <select class="form-select form-select-sm" id="scenario-date-range">
+                                <option value="24h">Last 24 hours</option>
+                                <option value="7d" selected>Last 7 days</option>
+                                <option value="30d">Last 30 days</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check mt-1">
+                                <input class="form-check-input" type="checkbox" id="scenario-ingest" checked>
+                                <label class="form-check-label" style="font-size:0.82rem;" for="scenario-ingest">Ingest to ES</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="scenario-kibana">
+                                <label class="form-check-label" style="font-size:0.82rem;" for="scenario-kibana">Create Kibana objects</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-primary btn-sm w-100" onclick="submitScenario()">
+                                <i class="fas fa-play me-1"></i>Start Scenario
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row g-4">
             <!-- Main form -->
             <div class="col-lg-8">
@@ -192,8 +305,71 @@
                             <li>Pattern: <code>logs-unstructured</code></li>
                             <li>Time field: <code>@timestamp</code></li>
                         </ul>
+                        <div class="section-label">Dashboard</div>
+                        <ul class="small mb-3">
+                            <li>1 pre-built Lens dashboard</li>
+                            <li>Markdown header + 6 panels</li>
+                        </ul>
                         <div class="section-label">Discover Sessions</div>
                         <ul class="small mb-0" id="kibana-sessions-list"></ul>
+                    </div>
+                </div>
+
+                <!-- Streaming Mode -->
+                <div class="card mt-3 fade-in">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-wave-square text-primary me-2"></i>Streaming Mode
+                            <span class="badge bg-primary ms-1" style="font-size:0.65rem;vertical-align:middle;">NEW</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3" style="font-size:0.8rem;">
+                            Continuously generate and ingest data at a target rate — ideal for testing alerting rules and live dashboards.
+                        </p>
+                        <div id="stream-inactive">
+                            <div class="mb-2">
+                                <label class="form-label" style="font-size:0.82rem;">Data type</label>
+                                <select class="form-select form-select-sm" id="stream-data-type">
+                                    {% for key, dt in data_generators.items() %}
+                                    <option value="{{ key }}">{{ dt.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:0.82rem;">Rate (events/min)</label>
+                                <input type="number" class="form-control form-control-sm" id="stream-rate" value="60" min="1" max="10000">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" style="font-size:0.82rem;">Stop after (events, 0 = unlimited)</label>
+                                <input type="number" class="form-control form-control-sm" id="stream-max" value="0" min="0">
+                            </div>
+                            <button class="btn btn-primary btn-sm w-100" onclick="startStream()">
+                                <i class="fas fa-play me-1"></i>Start Streaming
+                            </button>
+                        </div>
+                        <div id="stream-active" style="display:none;">
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <span class="status-dot success" style="flex-shrink:0;"></span>
+                                <span style="font-size:0.82rem;font-weight:600;" id="stream-active-type">Streaming…</span>
+                            </div>
+                            <div style="font-size:0.8rem;" class="mb-1">
+                                <span class="text-muted">Generated:</span>
+                                <span id="stream-total" class="fw-semibold">0</span>
+                            </div>
+                            <div style="font-size:0.8rem;" class="mb-1">
+                                <span class="text-muted">Rate:</span>
+                                <span id="stream-rate-actual" class="fw-semibold">—</span> /min
+                            </div>
+                            <div style="font-size:0.8rem;" class="mb-3">
+                                <span class="text-muted">Elapsed:</span>
+                                <span id="stream-elapsed" class="fw-semibold">0</span>s
+                            </div>
+                            <div id="stream-error" class="alert alert-warning py-2 mb-3" style="font-size:0.78rem;display:none;"></div>
+                            <button class="btn btn-danger btn-sm w-100" onclick="stopStream()">
+                                <i class="fas fa-stop me-1"></i>Stop Streaming
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -444,7 +620,123 @@
         document.addEventListener('DOMContentLoaded', function () {
             initGrid();
             updateKibanaObjectsState();
+            // Wire up scenario buttons
+            document.querySelectorAll('.run-scenario-btn').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    openScenarioOptions(btn.dataset.scenario);
+                });
+            });
+            // Start polling stream status
+            pollStreamStatus();
         });
+
+        // ---- Scenarios ----
+        let activeScenario = null;
+        const scenarioNames = {
+            deployment_failure: 'Deployment Failure',
+            security_incident: 'Security Incident',
+            database_slowdown: 'Database Slowdown',
+        };
+
+        function openScenarioOptions(name) {
+            activeScenario = name;
+            document.getElementById('scenario-options-title').textContent =
+                'Configure: ' + (scenarioNames[name] || name);
+            document.getElementById('scenario-options').style.display = '';
+            document.getElementById('scenario-options').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+        }
+
+        function cancelScenario() {
+            activeScenario = null;
+            document.getElementById('scenario-options').style.display = 'none';
+        }
+
+        function submitScenario() {
+            if (!activeScenario) return;
+            const btn = document.querySelector(`[data-scenario="${activeScenario}"] .run-scenario-btn`);
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Starting…'; }
+
+            fetch('/api/scenario/run', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    scenario: activeScenario,
+                    entries: parseInt(document.getElementById('scenario-entries').value) || 500,
+                    date_range: document.getElementById('scenario-date-range').value,
+                    ingest_to_es: document.getElementById('scenario-ingest').checked,
+                    create_kibana_objects: document.getElementById('scenario-kibana').checked,
+                }),
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play me-1"></i>Run Scenario'; }
+                    return;
+                }
+                window.location.href = '/progress/' + data.operation_id;
+            })
+            .catch(err => {
+                alert('Request failed: ' + err.message);
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play me-1"></i>Run Scenario'; }
+            });
+        }
+
+        // ---- Streaming ----
+        let streamPollTimer = null;
+
+        function startStream() {
+            const dataType = document.getElementById('stream-data-type').value;
+            const rate = parseInt(document.getElementById('stream-rate').value) || 60;
+            const maxEvents = parseInt(document.getElementById('stream-max').value) || 0;
+
+            fetch('/api/stream/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({data_type: dataType, rate_per_min: rate, max_events: maxEvents}),
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { alert('Error: ' + data.error); return; }
+                document.getElementById('stream-active-type').textContent =
+                    'Streaming ' + dataType.replace(/_/g, ' ') + ' @ ' + rate + '/min';
+                showStreamActive(true);
+            })
+            .catch(err => alert('Error: ' + err.message));
+        }
+
+        function stopStream() {
+            fetch('/api/stream/stop', {method: 'POST'})
+                .then(r => r.json())
+                .then(() => showStreamActive(false))
+                .catch(err => alert('Error: ' + err.message));
+        }
+
+        function showStreamActive(active) {
+            document.getElementById('stream-inactive').style.display = active ? 'none' : '';
+            document.getElementById('stream-active').style.display = active ? '' : 'none';
+        }
+
+        function pollStreamStatus() {
+            fetch('/api/stream/status')
+                .then(r => r.json())
+                .then(s => {
+                    if (s.active) {
+                        showStreamActive(true);
+                        document.getElementById('stream-total').textContent = s.total_generated.toLocaleString();
+                        document.getElementById('stream-rate-actual').textContent = s.actual_rate.toFixed(1);
+                        document.getElementById('stream-elapsed').textContent = s.elapsed_seconds;
+                        const errDiv = document.getElementById('stream-error');
+                        if (s.last_error) { errDiv.textContent = s.last_error; errDiv.style.display = ''; }
+                        else { errDiv.style.display = 'none'; }
+                    } else {
+                        showStreamActive(false);
+                    }
+                })
+                .catch(() => {})
+                .finally(() => { streamPollTimer = setTimeout(pollStreamStatus, 2000); });
+        }
     </script>
 </body>
 </html>

@@ -39,7 +39,11 @@ A modern, responsive web UI makes data generation accessible to everyone — no 
 - **Real-time Progress Tracking** — Live progress bar and timeline during generation
 - **Connection Testing** — Verify Elasticsearch and Kibana settings before generating
 - **Multiple Output Options** — CSV export, Elasticsearch ingestion, and Kibana objects
-- **Pre-built Dashboards** — Automatic creation of data views and Discover sessions
+- **Kibana Dashboards** — One Lens dashboard per data type (7 panels: markdown, metric stats, time-series, donut/bar) created automatically on ingest
+- **Streaming Mode** — Continuous data generation at a configurable rate (events/min) with live stats card and start/stop controls
+- **Correlated Scenarios** — Three multi-type incident scenarios that generate realistic correlated events across several data types within a shared incident window
+- **Generate All** — Single click to populate all 8 data types sequentially
+- **Cleanup / Reset** — Delete ES indices or clear CSV files directly from the dashboard
 - **Password Visibility Toggle** — Show/hide credentials on the Settings page
 
 ---
@@ -103,7 +107,28 @@ Open your browser and navigate to: **http://localhost:8080**
 4. Monitor progress → automatic redirect to the progress page
 5. Open Kibana → your data view and Discover sessions are ready
 
-### Workflow 4: Bulk Data Generation
+### Workflow 4: Generate All Data Types at Once
+
+1. Navigate to **Generate** → select the **All Data Types** card at the top
+2. Set entry count (multiplied across all 8 types) and enable desired options
+3. Click **Start Generation** → progress page shows 8 sequential steps
+4. Open Kibana → 8 data views, 4–6 Discover sessions, and 1 dashboard each
+
+### Workflow 5: Streaming / Continuous Mode
+
+1. Navigate to **Generate** → expand the **Streaming Mode** sidebar card
+2. Choose data type, rate (events/min), and optional max-event cap
+3. Click **Start Streaming** → data is ingested in batches at the requested rate
+4. Click **Stop Streaming** (or use `ldg stop` from the CLI) to halt
+
+### Workflow 6: Correlated Scenarios
+
+1. Navigate to **Generate** → click a scenario card (Deployment Failure, Security Incident, or Database Slowdown)
+2. Set entry count per type and click **Run Scenario**
+3. Correlated events are generated across 4–5 data types with a shared incident window
+4. Open Kibana → cross-reference the incident across logs, metrics, traces, and alerts
+
+### Workflow 7: Bulk Data Generation
 
 1. Adjust max entries in Settings (up to 10 M entries)
 2. Use CSV-only mode for fastest generation
@@ -242,7 +267,15 @@ Open your browser and navigate to: **http://localhost:8080**
 | `network-traffic` | Network flow data |
 | `apm` | APM transactions & errors |
 
-### Kibana Discover Sessions (Unstructured Logs)
+### Kibana Objects Created per Type
+
+For every data type the tool creates:
+
+- **1 data view** — index pattern wired to the correct index
+- **4–6 Discover sessions** — pre-built ES|QL queries covering common analysis patterns
+- **1 Lens dashboard** — 7-panel layout: markdown description, metric stats row, full-width time-series, donut and bar breakdowns
+
+#### Example sessions for Unstructured Logs
 
 1. **Retrieve All Logs** — Full log overview sorted by timestamp
 2. **Count Logs by Level** — Log level distribution aggregation
@@ -255,16 +288,75 @@ Open your browser and navigate to: **http://localhost:8080**
 
 ## Command-Line Usage
 
-For automation and scripting, the original CLI is still available:
+Install the package to get the `ldg` CLI:
 
 ```bash
-source venv/bin/activate
+pip install -e .
+```
 
-# Run with default settings (1 000 entries)
-python generate_logs.py
+### `ldg generate` — one-shot data generation
 
-# Customise entry count in the script
-# Edit num_entries= in generate_logs.py
+```bash
+# Generate 500 structured logs entries and ingest to ES
+ldg generate --data-type structured_logs --count 500 --ingest
+
+# Generate all 8 data types (200 entries each), ingest and create Kibana objects
+ldg generate --data-type all --count 200 --ingest --kibana
+
+# Export to CSV only
+ldg generate --data-type metrics --count 1000 --csv
+
+# Override connection settings inline
+ldg generate --data-type apm --count 100 --ingest \
+    --es-host http://localhost:9200 --es-user elastic --es-pass secret
+```
+
+### `ldg stream` / `ldg stop` — continuous streaming
+
+```bash
+# Stream metrics at 120 events/min, stop automatically after 5 000 events
+ldg stream --data-type metrics --rate 120 --max-events 5000
+
+# Stop a running stream
+ldg stop
+
+# Check streaming status
+ldg status
+```
+
+### `ldg scenario` — correlated multi-type incident
+
+```bash
+# List available scenarios
+ldg scenario --list
+
+# Run the security incident scenario (500 entries per type)
+ldg scenario security_incident --count 500 --ingest
+
+# Available scenarios:
+#   deployment_failure  — biases structured_logs, metrics, alerts, apm toward errors
+#   security_incident   — brute-force attack across security, network, alerts, logs
+#   database_slowdown   — slow DB queries across apm, metrics, logs, traces
+```
+
+### `ldg dashboard` — (re)create Kibana dashboards
+
+```bash
+# Create the Lens dashboard for a specific type
+ldg dashboard unstructured_logs
+
+# Recreate all 8 dashboards
+ldg dashboard all
+```
+
+### `ldg cleanup` — remove test data
+
+```bash
+# Delete all 8 ES indices
+ldg cleanup --es
+
+# Delete all generated CSV files
+ldg cleanup --csv
 ```
 
 ---
@@ -316,17 +408,24 @@ Real-time monitoring during every generation run:
 ### File Structure
 
 ```
-├── app.py                    # Flask web application
+├── app.py                    # Flask web application & all routes
 ├── data_generators.py        # 8 data type generator classes
-├── generate_logs.py          # CLI log generation & Kibana objects
-├── requirements.txt          # Python dependencies
+├── generate_logs.py          # Kibana objects (data views, Discover sessions)
+├── dashboards.py             # Kibana Lens dashboard builder (7 panels / type)
+├── streaming.py              # Thread-safe continuous streaming engine
+├── scenarios.py              # Correlated multi-type incident scenarios
+├── cli.py                    # ldg Click CLI entry point
+├── pyproject.toml            # Package metadata & ldg script entry point
 ├── config.json               # Connection settings (auto-generated)
+├── docker-compose.yml        # ES + Kibana + app stack
+├── Dockerfile                # Container image for the web app
 ├── templates/
-│   ├── index.html            # Dashboard with hero & stat cards
-│   ├── generate.html         # Data type picker & generation form
-│   ├── config.html           # Settings with color-coded sections
+│   ├── index.html            # Dashboard: stat cards, live stream status, cleanup
+│   ├── generate.html         # Type picker, scenarios, streaming sidebar
+│   ├── config.html           # Settings with env-var readonly badges
 │   └── progress.html         # Live progress & timeline
 ├── static/css/style.css      # Design system (CSS custom properties)
+├── static/vendor/            # Bundled Bootstrap 5.3.3 + Font Awesome 6.5.0
 ├── screenshots/              # UI screenshots
 ├── output_csv/               # Generated CSV files
 └── output_saved_objects/     # Kibana saved objects
@@ -386,6 +485,12 @@ curl -X POST "http://localhost:5601/api/saved_objects/_import?overwrite=true" \
 ---
 
 ## What's New
+
+### v5.0 — Dashboards, Streaming, Scenarios & CLI
+- **Kibana Dashboards** — `dashboards.py` auto-generates one 7-panel Lens dashboard per data type; compatible with Kibana 8.x via Saved Objects import API
+- **Streaming Mode** — `streaming.py` background thread ingests data at a configurable rate (events/min); interruptible via `stop_event.wait()`; live stats in the web UI
+- **Correlated Scenarios** — `scenarios.py` defines 3 incident scenarios (deployment failure, security incident, database slowdown) producing correlated events across 4–5 data types within a shared incident window
+- **`ldg` CLI** — `cli.py` pip-installable CLI (`pip install -e .`) with `generate`, `scenario`, `stream`, `stop`, `status`, `dashboard`, and `cleanup` commands
 
 ### v4.0 — UI Redesign
 - New design system with CSS custom properties (color tokens, shadow scale, easing)
